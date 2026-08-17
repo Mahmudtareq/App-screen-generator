@@ -1,5 +1,13 @@
 import { routes } from "@/config/routes";
-import type { AssetSlot } from "@/lib/editor/types";
+
+/**
+ * Which folder an upload lands in, and nothing more.
+ *
+ * Deliberately *not* the asset key: a key is `screenId/layerId`, which is
+ * per-session churn with a slash in it, and neither belongs in a signed folder
+ * path. Cloudinary only needs to know the sort of image this is.
+ */
+export type UploadKind = "screenshot" | "image" | "background";
 
 export interface UploadedAsset {
   publicId: string;
@@ -27,13 +35,13 @@ interface SignResponse {
  */
 export async function uploadToCloudinary(
   file: File,
-  slot: AssetSlot,
+  kind: UploadKind,
   onProgress?: (fraction: number) => void,
 ): Promise<UploadedAsset> {
   const signResponse = await fetch(routes.api.cloudinarySign, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ kind: slot }),
+    body: JSON.stringify({ kind }),
   });
 
   if (!signResponse.ok) {

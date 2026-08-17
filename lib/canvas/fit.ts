@@ -1,7 +1,13 @@
-export const CANVAS_PADDING = 48;
+/** Breathing room above and below the cards inside the filmstrip. */
+export const STRIP_PADDING = 24;
 
 /**
- * Scale factor that fits the artboard inside the preview container.
+ * Scale factor that fits an artboard into the filmstrip's height.
+ *
+ * Height is the only constraint. Every screen in a project shares one artboard, so
+ * the cards are all the same size, laid out in a row that scrolls horizontally —
+ * fitting to width as well would shrink five frames to thumbnails as soon as a
+ * sixth was added, which is the opposite of what the strip is for.
  *
  * The Stage absorbs this scale, which means every node in the tree works in
  * artboard px and nothing in the UI ever converts between screen and design
@@ -10,19 +16,13 @@ export const CANVAS_PADDING = 48;
  * Capped at 1 so a small artboard is shown at its natural size rather than blown
  * up into a blurry, misleading preview.
  */
-export function computeFitScale(
-  container: { width: number; height: number },
+export function computeCardScale(
+  stripHeight: number,
   artboard: { width: number; height: number },
-  padding = CANVAS_PADDING,
+  padding = STRIP_PADDING,
 ): number {
-  const availableWidth = container.width - padding * 2;
-  const availableHeight = container.height - padding * 2;
+  const available = stripHeight - padding * 2;
+  if (available <= 0) return 0;
 
-  if (availableWidth <= 0 || availableHeight <= 0) return 0;
-
-  return Math.min(
-    availableWidth / artboard.width,
-    availableHeight / artboard.height,
-    1,
-  );
+  return Math.min(available / artboard.height, 1);
 }

@@ -5,28 +5,29 @@ import { Layer, Rect } from "react-konva";
 import { useCanvasBitmap } from "@/hooks/use-canvas-image";
 import { coverCrop } from "@/lib/canvas/cover";
 import { BACKGROUND_LAYER_NAME } from "@/lib/canvas/layer-names";
-import { selectImageSource } from "@/lib/editor/selectors";
+import { selectImageSource, selectScreen } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
+import { backgroundAssetKey } from "@/lib/editor/types";
 
 /**
- * The artboard background, on its own Konva Layer — which means its own canvas
+ * One screen's background, on its own Konva Layer — which means its own canvas
  * element. It almost never repaints, so keeping it off the content layer saves a
  * full-artboard fill on every drag tick.
  *
  * Also the layer the export pipeline hides to produce a transparent PNG.
  */
-export function BackgroundLayer() {
-  const background = useEditorStore((s) => s.doc.background);
+export function BackgroundLayer({ screenId }: { screenId: string }) {
+  const background = useEditorStore((s) => selectScreen(screenId)(s)?.background);
   const artboard = useEditorStore((s) => s.doc.artboard);
 
   const imageUrl = useEditorStore((s) =>
-    s.doc.background.type === "image"
-      ? selectImageSource(s, "background", s.doc.background.url)
+    background?.type === "image"
+      ? selectImageSource(s, backgroundAssetKey(screenId), background.url)
       : null,
   );
   const bitmap = useCanvasBitmap(imageUrl);
 
-  if (background.type === "transparent") {
+  if (!background || background.type === "transparent") {
     return <Layer name={BACKGROUND_LAYER_NAME} listening={false} />;
   }
 

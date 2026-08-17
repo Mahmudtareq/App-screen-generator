@@ -8,6 +8,7 @@ export const routes = {
     login: "/login",
     register: "/register",
     editor: "/editor",
+    templates: "/templates",
   },
   private: {
     dashboard: "/dashboard",
@@ -24,4 +25,5 @@ export const PUBLIC_PATHS = [
   routes.public.login,
   routes.public.register,
   routes.public.editor,
+  routes.public.templates,
 ];

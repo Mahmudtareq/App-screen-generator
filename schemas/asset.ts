@@ -3,7 +3,8 @@ import { z } from "zod";
 import { objectIdSchema } from "./project";
 
 export const registerAssetSchema = z.object({
-  kind: z.enum(["screenshot", "logo", "background"]),
+  /** "logo" is legacy — image layers replaced the single logo slot. */
+  kind: z.enum(["screenshot", "image", "logo", "background"]),
   publicId: z.string().min(1).max(300),
   secureUrl: z.url(),
   width: z.number().int().positive(),

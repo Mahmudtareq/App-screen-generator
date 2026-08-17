@@ -17,7 +17,7 @@ Status legend: **✅ built and verified** · **◻ not started**
 | Device frames | SVG/Konva primitives, drawn from data | No asset licensing, crisp at any export scale |
 | Auth | Auth.js v5 — credentials (bcrypt) + optional Google | Real password verification, OAuth optional |
 | Package manager | pnpm | Matches sibling `../textnest-frontend` |
-| Editor document | Explicit slots, not a normalised node graph | Matches the product; z-order is fixed |
+| Editor document | A set of screens, each an ordered layer array | See "Reversed decisions" |
 | Device catalog | Static TypeScript, not MongoDB | Coupled to render code; needed synchronously on first paint |
 
 ### Conventions inherited from `../textnest-frontend`
@@ -34,6 +34,39 @@ The sibling project has these problems; they are fixed here rather than copied:
 mixed action envelopes (`{ok}` / `{status}` / `{success}`), zod only on the
 client, raw `process.env` with hardcoded fallbacks, `secret` set to a literal
 string, and an `authorize()` that returns credentials unconditionally.
+
+### Reversed decisions
+
+**Editor document: explicit slots → a set of screens, each an ordered layer array.**
+
+The original decision was one artboard per project with named slots (one device,
+one screenshot, one logo, captions) and a hardcoded z-order, on the grounds that
+"z-order is fixed" and a normalised node graph was more than the product needed.
+
+Both halves turned out to be wrong about the product:
+
+- **One artboard is not the unit of work.** Nobody ships one store screenshot;
+  they ship five. With a single-artboard document, making a matching set meant five
+  projects and re-doing the background and type five times, and retargeting to
+  another store size meant doing it again.
+- **Z-order is not fixed.** The commonest thing anyone wants is decoration behind
+  the device *and* something in front of it. Fixed slots cannot express that at
+  all, and adding "logo2" slots is how a slot model dies.
+
+So `doc` became `{ deviceId, orientation, artboard, screens[] }`, and each screen
+became `{ background, layers[] }` where `layers` is bottom-first. Device model,
+orientation and artboard stayed document-level: five frames of one listing that
+disagree about which phone they are aren't a set, and mixed export dimensions are
+never what anyone wanted.
+
+What the original reasoning got right, and is kept: layers are a discriminated
+union of three concrete kinds, not a generic node graph with arbitrary nesting.
+There are no groups, no nested transforms and no parent-child chains — the flat
+array is the whole model.
+
+Cost of the reversal: `EDITOR_DOC_VERSION` 1 → 2 with a migration
+(`lib/editor/persistence.ts`), which reproduces the old fixed z-order literally so
+a project saved under v1 opens looking identical.
 
 Note the sibling is **not** a Mongoose reference — `mongoose` is in its
 dependencies with zero connection code and no models. The whole data layer here
@@ -113,15 +146,48 @@ Against a real browser and a real MongoDB:
 
 ---
 
-## Phase 2 — Core editor ◻
+## Phase 2 — Multi-screen editor ✅ complete
+
+Rebuilt around a set of screens and an ordered layer stack, following the
+Shotsnapp/AppScreens filmstrip model.
+
+| # | Step | Status |
+|---|---|---|
+| 1 | Doc v2: screens, layer union, migration from v1 | ✅ |
+| 2 | Two templates in `config/templates.ts`, five screens each | ✅ |
+| 3 | Filmstrip of one Konva Stage per screen; stage registry keyed by screen id | ✅ |
+| 4 | Add / duplicate / delete / reorder / pin screens | ✅ |
+| 5 | Inline inspector: layer list, add/delete/restack, visibility and lock | ✅ |
+| 6 | Per-layer panels — device, image, text — plus per-screen background | ✅ |
+| 7 | Assets rekeyed `screenId/layerId`; upload walk over all screens | ✅ |
+| 8 | Per-screen export; `/templates` gallery; template restyle vs. start over | ✅ |
+
+Image layers replaced the single logo slot outright, which closed the "logo layer
+wired into the UI" item as a side effect. URL-based screenshot import already
+existed and was rewired per device layer.
+
+### Verified end to end
+
+Against a real browser (Playwright, dev server):
+
+- `/templates` → Aurora → five screens render, 15 canvases (3 layers × 5), zero
+  console errors
+- Clicking a card opens its inspector inline beside it; layer rows read Device
+  (layer 1, bottom) → Title → Subtitle, top-first
+- Add screen → 6, delete → 5; the last screen cannot be deleted
+- Screenshot dropped into a device layer renders clipped to the screen rect;
+  a separate image layer renders above it at layer 4 (top)
+- Export at 2× produced 2580 × 5592 with no `SecurityError` — the blob pipeline
+  holds with two independent image sources in one screen
+- 3× is correctly disabled at 6.9" (32MP), with the reason in the tooltip
+- `pnpm lint`, `pnpm type-check`, `pnpm build` clean
+
+### Still open from the original Phase 2
 
 - Visual tuning pass on all five device specs (see Risks — this is the real work)
-- Logo layer wired into the UI (the document slot and canvas node already exist)
-- URL-based screenshot import — server-side fetch proxy, then re-upload to
-  Cloudinary, to dodge CORS
 - Project duplicate/delete from the dashboard (actions exist; no UI yet)
 - Thumbnail generation on save, so dashboard cards stop being empty frames
-- Layers list with visibility and lock toggles
+- Drag-and-drop reordering, for both screens and layers (arrow buttons today)
 
 ## Phase 3 — Polish ◻
 
@@ -134,9 +200,11 @@ Against a real browser and a real MongoDB:
 
 ## Phase 4 — Nice to have ◻
 
-- Templates gallery — static `config/templates.ts` validated against
-  `editorDocSchema` in a unit test; promote to a collection only when
-  non-engineers need to author them
+- More templates — data-only additions to `config/templates.ts`. Promote to a
+  collection only when non-engineers need to author them. Worth adding a unit test
+  that every template's `createDocFromTemplate` output parses against
+  `editorDocSchema`; today only the two shipped ones are known-good, and by
+  inspection rather than assertion
 - Sharing via an explicit `visibility: "private" | "unlisted"` field plus a
   separate `getPublicProject` action — **never** by relaxing the ownership filter
 - PDF export, team accounts

@@ -17,8 +17,12 @@ import { signUpload, userFolder } from "@/lib/cloudinary";
  * write endpoint against the account's quota. Signing costs one small request and
  * lets the folder, the public id and the size limit be fixed server-side.
  */
+/**
+ * "logo" is retained only so assets uploaded before layers were generalised keep
+ * resolving; nothing writes it any more. New image layers use "image".
+ */
 const bodySchema = z.object({
-  kind: z.enum(["screenshot", "logo", "background"]),
+  kind: z.enum(["screenshot", "image", "logo", "background"]),
 });
 
 export async function POST(request: Request) {

@@ -1,6 +1,6 @@
 import { ensureLoaded } from "@/lib/canvas/image-cache";
 
-import type { AssetSlot, EditorAsset } from "./types";
+import type { AssetKey, EditorAsset } from "./types";
 
 export const ACCEPTED_IMAGE_TYPES = {
   "image/png": [".png"],
@@ -20,7 +20,7 @@ export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
  */
 export async function createLocalAsset(
   file: File,
-  slot: AssetSlot,
+  key: AssetKey,
 ): Promise<EditorAsset> {
   const localUrl = URL.createObjectURL(file);
 
@@ -30,7 +30,7 @@ export async function createLocalAsset(
     const image = await ensureLoaded(localUrl);
 
     return {
-      slot,
+      key,
       localUrl,
       width: image.naturalWidth,
       height: image.naturalHeight,

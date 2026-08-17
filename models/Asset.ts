@@ -10,7 +10,8 @@ import { Schema, model, models, type Model, type Types } from "mongoose";
 export interface IAsset {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
-  kind: "screenshot" | "logo" | "background";
+  /** "logo" is legacy — image layers replaced the single logo slot. */
+  kind: "screenshot" | "image" | "logo" | "background";
   publicId: string;
   secureUrl: string;
   width: number;
@@ -26,7 +27,7 @@ const assetSchema = new Schema<IAsset>(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     kind: {
       type: String,
-      enum: ["screenshot", "logo", "background"],
+      enum: ["screenshot", "image", "logo", "background"],
       required: true,
     },
     publicId: { type: String, required: true },

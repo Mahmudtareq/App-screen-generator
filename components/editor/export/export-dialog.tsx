@@ -30,30 +30,37 @@ import {
   type ExportFormat,
   type ExportScale,
 } from "@/lib/export/formats";
-import { selectFitScale, selectImageSource } from "@/lib/editor/selectors";
+import {
+  selectCardScale,
+  selectOpaqueFallback,
+  selectScreenImageUrls,
+} from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
+import { screenLabel } from "@/schemas/editor";
 
 import { Field } from "../panels/panel-section";
 
+/**
+ * Exports one screen at full artboard resolution.
+ *
+ * One screen at a time, deliberately: each screen is its own Konva Stage, and a
+ * browser holding five 32-megapixel canvases at once is how this runs out of memory
+ * on an iPad. Batch export across the whole set is the first feature here that
+ * genuinely needs a server to composite — see PLAN.md.
+ */
 export function ExportDialog() {
-  const open = useEditorStore((s) => s.exportOpen);
-  const setOpen = useEditorStore((s) => s.setExportOpen);
+  const screenId = useEditorStore((s) => s.exportScreenId);
+  const closeExport = useEditorStore((s) => s.closeExport);
   const isExporting = useEditorStore((s) => s.isExporting);
   const setExporting = useEditorStore((s) => s.setExporting);
-  const artboard = useEditorStore((s) => s.doc.artboard);
-  const fitScale = useEditorStore(selectFitScale);
-  const background = useEditorStore((s) => s.doc.background);
 
-  const screenshotUrl = useEditorStore((s) =>
-    selectImageSource(s, "screenshot", s.doc.screenshot.url),
+  const artboard = useEditorStore((s) => s.doc.artboard);
+  const cardScale = useEditorStore(selectCardScale);
+  const index = useEditorStore((s) =>
+    s.doc.screens.findIndex((screen) => screen.id === screenId),
   );
-  const logoUrl = useEditorStore((s) =>
-    s.doc.logo ? selectImageSource(s, "logo", s.doc.logo.url) : null,
-  );
-  const backgroundUrl = useEditorStore((s) =>
-    s.doc.background.type === "image"
-      ? selectImageSource(s, "background", s.doc.background.url)
-      : null,
+  const screen = useEditorStore((s) =>
+    s.doc.screens.find((current) => current.id === screenId),
   );
 
   const [format, setFormat] = useState<ExportFormat>("png");
@@ -66,29 +73,35 @@ export function ExportDialog() {
   const dims = exportDimensions(artboard, scale);
 
   const handleExport = async () => {
-    const stage = getStage();
+    if (!screenId) return;
+
+    const stage = getStage(screenId);
     if (!stage) {
-      toast.error("The canvas is not ready yet.");
+      toast.error("That screen's canvas is not ready yet.");
       return;
     }
 
     setExporting(true);
     try {
+      // Read these at export time rather than subscribing: the dialog does not need
+      // to re-render when an upload finishes, only to know the URLs when it fires.
+      const state = useEditorStore.getState();
+
       const blob = await exportStage(
         stage,
         { format, scale, quality, transparent },
         {
-          fitScale,
+          fitScale: cardScale,
           artboard,
-          imageUrls: [screenshotUrl, logoUrl, backgroundUrl],
-          opaqueFallback: background.type === "color" ? background.color : "#ffffff",
+          imageUrls: selectScreenImageUrls(state, screenId),
+          opaqueFallback: selectOpaqueFallback(state, screenId),
         },
       );
 
       const extension =
         EXPORT_FORMATS.find((f) => f.id === format)?.extension ?? "png";
-      downloadBlob(blob, toFilename("mockup", extension));
-      setOpen(false);
+      downloadBlob(blob, toFilename(`screen-${index + 1}`, extension));
+      closeExport();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Export failed. Please try again.",
@@ -99,10 +112,12 @@ export function ExportDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={Boolean(screenId)} onOpenChange={(open) => !open && closeExport()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Export mockup</DialogTitle>
+          <DialogTitle>
+            Export {screen ? screenLabel(screen, index) : "screen"}
+          </DialogTitle>
           <DialogDescription>
             Rendered at full artboard resolution, not upscaled from the preview.
           </DialogDescription>
@@ -191,7 +206,7 @@ export function ExportDialog() {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
+          <Button variant="ghost" onClick={closeExport}>
             Cancel
           </Button>
           <Button onClick={handleExport} disabled={isExporting || !dims.withinLimits}>

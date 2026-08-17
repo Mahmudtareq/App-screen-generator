@@ -13,10 +13,16 @@ import { SelectionTransformer } from "../controls/selection-transformer";
  * Transformer baked into an exported PNG is the most obvious way for this app to
  * look broken.
  */
-export function OverlayLayer({ fitScale }: { fitScale: number }) {
+export function OverlayLayer({
+  screenId,
+  cardScale,
+}: {
+  screenId: string;
+  cardScale: number;
+}) {
   return (
     <Layer name={OVERLAY_LAYER_NAME}>
-      <SelectionTransformer fitScale={fitScale} />
+      <SelectionTransformer screenId={screenId} cardScale={cardScale} />
     </Layer>
   );
 }

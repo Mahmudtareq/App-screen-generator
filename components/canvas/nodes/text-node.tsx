@@ -7,22 +7,32 @@ import { Group, Rect, Text } from "react-konva";
 
 import { resolveFontFamily } from "@/config/fonts";
 import { dragPatch, normalizeTextTransform } from "@/lib/canvas/transform";
-import { selectTextLayer } from "@/lib/editor/selectors";
+import { selectLayerById } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
-import { textNodeId } from "@/lib/editor/types";
+import { isTextLayer } from "@/schemas/editor";
 
 /**
  * One text layer, optionally sitting on a filled pill.
  *
  * Subscribes to its own layer only, so moving one caption does not re-render the
- * others — `updateTextLayer` maps over the array and leaves untouched layers
+ * others — `updateLayer` maps over the array and leaves untouched layers
  * referentially identical, which is what makes that subscription granular.
  */
-export function TextNode({ id }: { id: string }) {
-  const layer = useEditorStore(selectTextLayer(id));
+export function TextNode({
+  screenId,
+  layerId,
+}: {
+  screenId: string;
+  layerId: string;
+}) {
+  const layer = useEditorStore((s) => {
+    const found = selectLayerById(screenId, layerId)(s);
+    return found && isTextLayer(found) ? found : undefined;
+  });
+
   const fontsVersion = useEditorStore((s) => s.fontsVersion);
   const commitTransform = useEditorStore((s) => s.commitTransform);
-  const select = useEditorStore((s) => s.select);
+  const selectLayer = useEditorStore((s) => s.selectLayer);
 
   const textRef = useRef<Konva.Text>(null);
   const pillRef = useRef<Konva.Rect>(null);
@@ -75,16 +85,16 @@ export function TextNode({ id }: { id: string }) {
 
   if (!layer || !layer.visible) return null;
 
-  const nodeId = textNodeId(layer.id);
   const shadow = layer.shadow;
 
   const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
-    commitTransform(nodeId, dragPatch(e.target));
+    commitTransform(screenId, layerId, dragPatch(e.target));
   };
 
   const handleTransformEnd = (e: KonvaEventObject<Event>) => {
     commitTransform(
-      nodeId,
+      screenId,
+      layerId,
       normalizeTextTransform(e.target, {
         width: layer.width,
         fontSize: layer.fontSize,
@@ -94,15 +104,16 @@ export function TextNode({ id }: { id: string }) {
 
   return (
     <Group
-      id={nodeId}
-      name={nodeId}
+      id={layerId}
+      name={layerId}
       x={layer.x}
       y={layer.y}
       rotation={layer.rotation}
       opacity={layer.opacity}
-      draggable
-      onMouseDown={() => select(nodeId)}
-      onTap={() => select(nodeId)}
+      draggable={!layer.locked}
+      listening={!layer.locked}
+      onMouseDown={() => selectLayer(screenId, layerId)}
+      onTap={() => selectLayer(screenId, layerId)}
       // Never write state on drag *move*: Konva already moves the node
       // imperatively at 60fps, and a per-tick setState would re-render the scene.
       onDragEnd={handleDragEnd}

@@ -1,28 +1,34 @@
 "use client";
 
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CanvasHost } from "@/components/canvas/canvas-host";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useProjectBootstrap } from "@/hooks/use-project-bootstrap";
-import type { EditorDoc } from "@/schemas/editor";
 
+import { AppBar } from "./app-bar";
 import { EditorToolbar } from "./editor-toolbar";
 import { ExportDialog } from "./export/export-dialog";
-import { ArtboardPanel } from "./panels/artboard-panel";
-import { BackgroundPanel } from "./panels/background-panel";
-import { DevicePanel } from "./panels/device-panel";
-import { LogoPanel } from "./panels/logo-panel";
-import { TextPanel } from "./panels/text-panel";
+import { ScreenStrip } from "./screens/screen-strip";
 
 export interface EditorShellProps {
   projectId?: string;
   projectName?: string;
-  initialDoc?: EditorDoc;
+  /**
+   * Typed loosely on purpose: `Project.doc` is a `Mixed` subdocument, so what comes
+   * back from the database is whatever version was written. The bootstrap hook runs
+   * it through `migrateDoc` rather than trusting the declared type.
+   */
+  initialDoc?: unknown;
   signedIn: boolean;
 }
 
+/**
+ * The editor: a product bar, a project toolbar, and the filmstrip of screens.
+ *
+ * There is no left rail of tabs any more. Everything that edits one screen lives in
+ * that screen's inspector, inline in the strip beside it, and everything that edits
+ * the project lives in the toolbar. The split is by scope rather than by category,
+ * which is what makes it obvious whether a control will change one frame or five.
+ */
 export function EditorShell({
   projectId,
   projectName,
@@ -31,54 +37,33 @@ export function EditorShell({
 }: EditorShellProps) {
   const ready = useProjectBootstrap(initialDoc);
   useEditorShortcuts();
+  console.log("EditorShell render", {
+    projectId,
+    projectName,
+    initialDoc,
+    signedIn,
+    ready,
+  });
 
   return (
     <div className="flex h-dvh flex-col">
+      <AppBar active="editor" projectName={projectName} signedIn={signedIn} />
+
       <EditorToolbar
         projectId={projectId}
         projectName={projectName}
         signedIn={signedIn}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-80 shrink-0 border-r md:block">
-          <Tabs defaultValue="device" className="flex h-full flex-col gap-0">
-            <TabsList className="m-3 grid w-auto grid-cols-3">
-              <TabsTrigger value="device">Device</TabsTrigger>
-              <TabsTrigger value="design">Design</TabsTrigger>
-              <TabsTrigger value="text">Text</TabsTrigger>
-            </TabsList>
-
-            <ScrollArea className="min-h-0 flex-1">
-              {ready ? (
-                <>
-                  <TabsContent value="device" className="m-0">
-                    <DevicePanel />
-                  </TabsContent>
-                  <TabsContent value="design" className="m-0">
-                    <BackgroundPanel />
-                    <LogoPanel />
-                    <ArtboardPanel />
-                  </TabsContent>
-                  <TabsContent value="text" className="m-0">
-                    <TextPanel />
-                  </TabsContent>
-                </>
-              ) : (
-                <div className="space-y-3 p-4">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              )}
-            </ScrollArea>
-          </Tabs>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <CanvasHost />
-        </main>
-      </div>
+      {ready ? (
+        <ScreenStrip />
+      ) : (
+        <div className="flex min-h-0 flex-1 items-center gap-3 overflow-hidden bg-muted/40 p-6">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-full w-56 shrink-0 rounded-xl" />
+          ))}
+        </div>
+      )}
 
       <ExportDialog />
     </div>

@@ -9,22 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { captureWebsite } from "@/lib/capture/capture-client";
-import type { DeviceId } from "@/lib/devices/catalog";
 import { createLocalAsset } from "@/lib/editor/assets";
 import { useEditorStore } from "@/lib/editor/store";
+import { layerAssetKey } from "@/lib/editor/types";
 
 /**
- * Paste a URL, get that site rendered inside the device frame.
+ * Paste a URL, get that site rendered inside this screen's device frame.
  *
  * The captured image is handed to `createLocalAsset` — the same function a
  * dropped file goes through — so it renders instantly from an object URL and
  * uploads to Cloudinary on save, with no separate handling anywhere downstream.
  */
-export function UrlCapture() {
+export function UrlCapture({
+  screenId,
+  layerId,
+}: {
+  screenId: string;
+  layerId: string;
+}) {
   const deviceId = useEditorStore((s) => s.doc.deviceId);
   const orientation = useEditorStore((s) => s.doc.orientation);
   const setAsset = useEditorStore((s) => s.setAsset);
-  const setScreenshot = useEditorStore((s) => s.setScreenshot);
+  const updateLayer = useEditorStore((s) => s.updateLayer);
 
   const [url, setUrl] = useState("");
   const [fullPage, setFullPage] = useState(false);
@@ -37,17 +43,16 @@ export function UrlCapture() {
     const toastId = toast.loading("Capturing the page…");
 
     try {
-      const file = await captureWebsite({
-        url,
-        deviceId: deviceId as DeviceId,
-        orientation,
-        fullPage,
-      });
+      const file = await captureWebsite({ url, deviceId, orientation, fullPage });
 
-      const asset = await createLocalAsset(file, "screenshot");
+      const key = layerAssetKey(screenId, layerId);
+      const asset = await createLocalAsset(file, key);
       setAsset(asset);
+
       // A previous upload's URL would otherwise keep rendering after a reload.
-      setScreenshot({ assetId: null, url: null, zoom: 1, pan: { x: 0, y: 0 } });
+      updateLayer(screenId, layerId, {
+        screenshot: { assetId: null, url: null, zoom: 1, pan: { x: 0, y: 0 } },
+      });
 
       toast.success("Captured", { id: toastId });
     } catch (error) {
@@ -70,14 +75,14 @@ export function UrlCapture() {
           placeholder="stripe.com"
           inputMode="url"
           spellCheck={false}
-          className="h-9"
+          className="h-8"
           disabled={busy}
         />
         <Button
           onClick={capture}
           disabled={busy || !url.trim()}
           size="sm"
-          className="h-9 shrink-0"
+          className="h-8 shrink-0"
         >
           {busy ? (
             <Loader2 className="size-4 animate-spin" />
@@ -89,11 +94,14 @@ export function UrlCapture() {
       </div>
 
       <div className="flex items-center justify-between">
-        <Label htmlFor="full-page" className="text-xs font-normal text-muted-foreground">
+        <Label
+          htmlFor={`full-page-${layerId}`}
+          className="text-xs font-normal text-muted-foreground"
+        >
           Capture the full page
         </Label>
         <Switch
-          id="full-page"
+          id={`full-page-${layerId}`}
           checked={fullPage}
           onCheckedChange={setFullPage}
           disabled={busy}

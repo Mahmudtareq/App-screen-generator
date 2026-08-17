@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { ARTBOARD_MAX, ARTBOARD_MIN } from "@/config/artboards";
 import { CANVAS_FONT_IDS, DEFAULT_FONT_ID } from "@/config/fonts";
+import { DEFAULT_TEMPLATE_ID, MAX_SCREENS, TEMPLATE_IDS } from "@/config/templates";
 import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
 
 /**
@@ -10,9 +11,23 @@ import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
  *
  * The store's `document` slice serialises to exactly this shape, so saving is
  * `updateProject(id, doc)` with no field mapping in between.
+ *
+ * A document is a *set of screens*, because that is what an app store listing is:
+ * five or so frames that share a device and a canvas size and differ only in
+ * their artwork and copy. Device model, orientation and artboard therefore live at
+ * the document level — changing the target size has to move all five frames at
+ * once or the set stops being a set.
+ *
+ * Within a screen, content is an **ordered layer array** rather than named slots:
+ * `layers[0]` paints first and is furthest back, and the last entry is on top.
+ * That ordering is the whole reason the array exists — the alternative, fixed
+ * slots with a hardcoded z-order, cannot express two images stacked either side
+ * of the device, which is the most common thing anyone wants to do to a mockup.
+ * The background is not a layer; it is always behind every layer and is the one
+ * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 1;
+export const EDITOR_DOC_VERSION = 2;
 
 const hexColorSchema = z
   .string()
@@ -24,10 +39,15 @@ const hexColorSchema = z
 /**
  * A URL that is safe to persist.
  *
- * Rejecting `blob:` and `data:` is what makes the "upload before save" step
+ * Rejecting anything but https is what makes the "upload before save" step
  * impossible to skip: an anonymous draft renders from an object URL, and trying
  * to save it before the Cloudinary upload has patched in a real URL fails
  * validation loudly instead of writing a URL that is dead on next page load.
+ *
+ * Every image URL in the document is *nullable* rather than defaulting to an
+ * empty string. An empty string is not a valid URL, so a document holding one
+ * fails its own schema — which silently drops a whole localStorage draft on
+ * reload when a layer exists but its upload has not happened yet.
  */
 export const assetUrlSchema = z
   .string()
@@ -70,13 +90,14 @@ export const backgroundSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("image"),
     assetId: objectIdStringSchema.nullable().default(null),
-    url: assetUrlSchema,
+    url: assetUrlSchema.nullable().default(null),
     fit: z.enum(["cover", "contain"]).default("cover"),
     blur: z.number().min(0).max(100).default(0),
     opacity: z.number().min(0).max(1).default(1),
   }),
 ]);
 
+/** The screenshot shown inside a device layer's screen cut-out. */
 export const screenshotSchema = z.object({
   assetId: objectIdStringSchema.nullable().default(null),
   url: assetUrlSchema.nullable().default(null),
@@ -86,19 +107,6 @@ export const screenshotSchema = z.object({
   pan: z
     .object({ x: z.number().min(-1).max(1), y: z.number().min(-1).max(1) })
     .default({ x: 0, y: 0 }),
-});
-
-export const logoSchema = z.object({
-  assetId: objectIdStringSchema.nullable().default(null),
-  url: assetUrlSchema,
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1).max(ARTBOARD_MAX),
-  height: z.number().min(1).max(ARTBOARD_MAX),
-  rotation: z.number().min(-360).max(360).default(0),
-  opacity: z.number().min(0).max(1).default(1),
-  cornerRadius: z.number().min(0).default(0),
-  visible: z.boolean().default(true),
 });
 
 /** Drop shadow, for captions sitting over a busy background image. */
@@ -124,8 +132,58 @@ export const textBackgroundSchema = z.object({
   cornerRadius: z.number().min(0).max(999).default(999),
 });
 
-export const textLayerSchema = z.object({
+/**
+ * Fields every layer carries, whatever its kind.
+ *
+ * Spread into each member of the union rather than composed with `.extend()`, so
+ * the members stay plain object schemas — `z.discriminatedUnion` needs to read the
+ * discriminator off each one directly.
+ *
+ * `id` is only unique within its screen, which is all that is required: each
+ * screen renders into its own Konva Stage, and a Stage is the scope `findOne("#id")`
+ * searches. That is what lets the layer id double as the canvas node id with no
+ * screen prefix and no lookup table.
+ */
+const layerBaseFields = {
   id: z.string().min(1).max(64),
+  /** User-facing label. Empty means "derive it from the kind". */
+  name: z.string().max(60).default(""),
+  visible: z.boolean().default(true),
+  /** Locked layers still render but cannot be selected or dragged on canvas. */
+  locked: z.boolean().default(false),
+  opacity: z.number().min(0).max(1).default(1),
+};
+
+export const deviceLayerSchema = z.object({
+  ...layerBaseFields,
+  kind: z.literal("device"),
+  colorwayId: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  /** Uniform scale from device px into artboard px. */
+  scale: z.number().min(0.01).max(20),
+  rotation: z.number().min(-360).max(360).default(0),
+  shadowEnabled: z.boolean().default(true),
+  screenshot: screenshotSchema,
+});
+
+export const imageLayerSchema = z.object({
+  ...layerBaseFields,
+  kind: z.literal("image"),
+  assetId: objectIdStringSchema.nullable().default(null),
+  url: assetUrlSchema.nullable().default(null),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1).max(ARTBOARD_MAX),
+  height: z.number().min(1).max(ARTBOARD_MAX),
+  rotation: z.number().min(-360).max(360).default(0),
+  cornerRadius: z.number().min(0).default(0),
+});
+
+export const textLayerSchema = z.object({
+  ...layerBaseFields,
+  kind: z.literal("text"),
+  /** Drives default size and placement only; it is not a style lock. */
   role: z.enum(["title", "body"]),
   text: z.string().max(2000).default(""),
   fontId: z.enum(CANVAS_FONT_IDS).default(DEFAULT_FONT_ID),
@@ -147,37 +205,90 @@ export const textLayerSchema = z.object({
   rotation: z.number().min(-360).max(360).default(0),
   lineHeight: z.number().min(0.5).max(4).default(1.2),
   letterSpacing: z.number().min(-50).max(200).default(0),
-  opacity: z.number().min(0).max(1).default(1),
-  visible: z.boolean().default(true),
+});
+
+export const screenLayerSchema = z.discriminatedUnion("kind", [
+  deviceLayerSchema,
+  imageLayerSchema,
+  textLayerSchema,
+]);
+
+export const screenSchema = z.object({
+  id: z.string().min(1).max(64),
+  /** Empty means "call it Screen N", numbered by position rather than stored. */
+  name: z.string().max(60).default(""),
+  /**
+   * Pinned screens are skipped by anything that writes across the whole set —
+   * "apply background to all", template swap, artboard retarget. It is the opt-out
+   * for the one frame in five that has been hand-tuned.
+   */
+  pinned: z.boolean().default(false),
+  background: backgroundSchema,
+  /** Index 0 paints first and sits at the back. */
+  layers: z.array(screenLayerSchema).max(24).default([]),
 });
 
 export const editorDocSchema = z.object({
   version: z.number().int().min(1).default(EDITOR_DOC_VERSION),
+  /** Which template the project started from; kept so the picker can show it. */
+  templateId: z.enum(TEMPLATE_IDS).default(DEFAULT_TEMPLATE_ID),
   deviceId: z.enum(DEVICE_IDS).default(DEFAULT_DEVICE_ID),
-  colorwayId: z.string().min(1),
   orientation: orientationSchema.default("portrait"),
-  device: z.object({
-    x: z.number(),
-    y: z.number(),
-    /** Uniform scale from device px into artboard px. */
-    scale: z.number().min(0.01).max(20),
-    rotation: z.number().min(-360).max(360).default(0),
-    shadowEnabled: z.boolean().default(true),
-  }),
   artboard: artboardSchema,
-  background: backgroundSchema,
-  screenshot: screenshotSchema,
-  logo: logoSchema.nullable().default(null),
-  textLayers: z.array(textLayerSchema).max(20).default([]),
+  screens: z.array(screenSchema).min(1).max(MAX_SCREENS),
 });
 
 export type EditorDoc = z.infer<typeof editorDocSchema>;
+export type Screen = z.infer<typeof screenSchema>;
+export type ScreenLayer = z.infer<typeof screenLayerSchema>;
+export type LayerKind = ScreenLayer["kind"];
+export type DeviceLayer = z.infer<typeof deviceLayerSchema>;
+export type ImageLayer = z.infer<typeof imageLayerSchema>;
+export type TextLayer = z.infer<typeof textLayerSchema>;
 export type Artboard = z.infer<typeof artboardSchema>;
 export type Background = z.infer<typeof backgroundSchema>;
 export type BackgroundType = Background["type"];
 export type ScreenshotState = z.infer<typeof screenshotSchema>;
-export type LogoLayer = z.infer<typeof logoSchema>;
-export type TextLayer = z.infer<typeof textLayerSchema>;
 export type TextRole = TextLayer["role"];
 export type TextShadow = z.infer<typeof textShadowSchema>;
 export type TextBackground = z.infer<typeof textBackgroundSchema>;
+
+/* --------------------------------- helpers -------------------------------- */
+
+/** Narrowing helpers, so callers never hand-write `l.kind === "device"` chains. */
+export function isDeviceLayer(layer: ScreenLayer): layer is DeviceLayer {
+  return layer.kind === "device";
+}
+
+export function isImageLayer(layer: ScreenLayer): layer is ImageLayer {
+  return layer.kind === "image";
+}
+
+export function isTextLayer(layer: ScreenLayer): layer is TextLayer {
+  return layer.kind === "text";
+}
+
+const KIND_LABELS: Record<LayerKind, string> = {
+  device: "Device",
+  image: "Image",
+  text: "Text",
+};
+
+/**
+ * What the layer list shows for a layer.
+ *
+ * Derived rather than required, so a layer created by a template or a migration
+ * does not have to invent a name — and renaming stays purely cosmetic.
+ */
+export function layerLabel(layer: ScreenLayer): string {
+  if (layer.name) return layer.name;
+  if (isTextLayer(layer)) {
+    return layer.role === "title" ? "Title" : "Subtitle";
+  }
+  return KIND_LABELS[layer.kind];
+}
+
+/** Screen name for the strip, falling back to its 1-based position. */
+export function screenLabel(screen: Screen, index: number): string {
+  return screen.name || `Screen ${index + 1}`;
+}

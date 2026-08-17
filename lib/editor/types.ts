@@ -1,30 +1,60 @@
-import type { EditorDoc } from "@/schemas/editor";
+import type { EditorDoc, LayerKind } from "@/schemas/editor";
 
 export type { EditorDoc };
 
 /**
- * Selection is addressed by the same string used as the Konva node id, so the
- * Transformer can attach with `stage.findOne("#" + selectedId)` and no lookup
- * table is needed.
+ * Selection is a (screen, layer) pair.
+ *
+ * Two separate fields rather than one object, because they change independently:
+ * clicking a card's chrome selects a screen and opens its inspector without
+ * touching the layer selection, and Escape drops the layer while leaving the
+ * inspector open. An object would make every screen click a new reference and
+ * re-render every subscriber of either half.
+ *
+ * The layer id doubles as the Konva node id — each screen is its own Stage, so a
+ * layer id is unique within the scope `stage.findOne("#id")` searches, and no
+ * prefixing or lookup table is needed.
  */
-export const DEVICE_NODE_ID = "device";
-export const LOGO_NODE_ID = "logo";
-export const textNodeId = (id: string) => `text:${id}`;
-
-export type SelectedId = string | null;
-
-export type SelectionKind = "device" | "logo" | "text" | null;
-
-export function selectionKind(selectedId: SelectedId): SelectionKind {
-  if (!selectedId) return null;
-  if (selectedId === DEVICE_NODE_ID) return "device";
-  if (selectedId === LOGO_NODE_ID) return "logo";
-  if (selectedId.startsWith("text:")) return "text";
-  return null;
+export interface EditorSelection {
+  screenId: string | null;
+  layerId: string | null;
 }
 
-export function textIdFromNodeId(selectedId: SelectedId): string | null {
-  return selectedId?.startsWith("text:") ? selectedId.slice("text:".length) : null;
+/**
+ * Where an uploadable image belongs, as a single string.
+ *
+ * With arbitrary layers there is no longer a fixed set of slots to key assets by,
+ * so the key is composed from the ids of the things that own the image. Two forms
+ * exist, and `parseAssetKey` is the only place that knows the difference:
+ *
+ *   "<screenId>/<layerId>"   an image layer, or a device layer's screenshot
+ *   "<screenId>/background"  the screen background
+ */
+export type AssetKey = string;
+
+const BACKGROUND_TARGET = "background";
+
+export function layerAssetKey(screenId: string, layerId: string): AssetKey {
+  return `${screenId}/${layerId}`;
+}
+
+export function backgroundAssetKey(screenId: string): AssetKey {
+  return `${screenId}/${BACKGROUND_TARGET}`;
+}
+
+export function parseAssetKey(
+  key: AssetKey,
+): { screenId: string; layerId: string | null } | null {
+  const separator = key.indexOf("/");
+  if (separator <= 0) return null;
+
+  const screenId = key.slice(0, separator);
+  const target = key.slice(separator + 1);
+
+  return {
+    screenId,
+    layerId: target === BACKGROUND_TARGET ? null : target,
+  };
 }
 
 /**
@@ -35,23 +65,15 @@ export function textIdFromNodeId(selectedId: SelectedId): string | null {
  * The document stores only the resulting https URL and, once saved, the database
  * id of the Asset row.
  *
- * They are keyed by *slot* rather than by a generated id. The document has fixed
- * slots — one screenshot, one logo, one background — so a slot key is enough to
- * link a dropped file to where it renders, and it avoids inventing a client-side
- * id that would then have to be kept out of the document's `assetId` fields
- * (those hold real database ObjectIds).
- *
  * Note that `localUrl` stays the render source for the whole session even after
  * the upload finishes — re-fetching the image from Cloudinary just to draw what
  * the browser already has in memory would buy nothing and reintroduce the
  * canvas-tainting risk that the blob-URL pipeline exists to remove.
  */
-export type AssetSlot = "screenshot" | "logo" | "background";
-
 export type AssetStatus = "local" | "uploading" | "uploaded" | "error";
 
 export interface EditorAsset {
-  slot: AssetSlot;
+  key: AssetKey;
   localUrl: string;
   width: number;
   height: number;
@@ -73,3 +95,8 @@ export interface TransformPatch {
   fontSize?: number;
   scale?: number;
 }
+
+/** Which kinds the "add layer" menu offers — a device is added with its screen. */
+export const ADDABLE_LAYER_KINDS: readonly LayerKind[] = ["image", "text"];
+
+export type LayerMove = "up" | "down" | "top" | "bottom";

@@ -1,56 +1,119 @@
-import { computeFitScale } from "@/lib/canvas/fit";
-import { getColorway, getDevice, type DeviceId } from "@/lib/devices/catalog";
+import { computeCardScale } from "@/lib/canvas/fit";
+import { getColorway, getDevice } from "@/lib/devices/catalog";
 import { orientSpec } from "@/lib/devices/orientation";
-import type { DeviceSpec } from "@/lib/devices/types";
-import type { TextLayer } from "@/schemas/editor";
+import type { Colorway, DeviceSpec } from "@/lib/devices/types";
+import {
+  isDeviceLayer,
+  isImageLayer,
+  type Screen,
+  type ScreenLayer,
+} from "@/schemas/editor";
 
 import type { EditorState } from "./state";
-import { textIdFromNodeId, type AssetSlot } from "./types";
+import { backgroundAssetKey, layerAssetKey, type AssetKey } from "./types";
 
 /**
  * Derived, not stored: keeping fit scale out of state means it can never drift
- * out of sync with the container size or the artboard that produced it.
+ * out of sync with the strip height or the artboard that produced it.
  */
-export function selectFitScale(state: EditorState): number {
-  return computeFitScale(
-    { width: state.containerWidth, height: state.containerHeight },
-    state.doc.artboard,
-  );
+export function selectCardScale(state: EditorState): number {
+  return computeCardScale(state.stripHeight, state.doc.artboard);
 }
 
 /** The device spec as it should be rendered, already rotated for the orientation. */
 export function selectOrientedSpec(state: EditorState): DeviceSpec {
-  return orientSpec(getDevice(state.doc.deviceId as DeviceId), state.doc.orientation);
+  return orientSpec(getDevice(state.doc.deviceId), state.doc.orientation);
 }
 
-export function selectColorway(state: EditorState) {
-  return getColorway(selectOrientedSpec(state), state.doc.colorwayId);
+export function selectScreen(screenId: string) {
+  return (state: EditorState): Screen | undefined =>
+    state.doc.screens.find((screen) => screen.id === screenId);
 }
 
-export function selectSelectedTextLayer(state: EditorState): TextLayer | null {
-  const id = textIdFromNodeId(state.selectedId);
-  if (!id) return null;
-  return state.doc.textLayers.find((layer) => layer.id === id) ?? null;
-}
-
-export function selectTextLayer(id: string) {
-  return (state: EditorState): TextLayer | undefined =>
-    state.doc.textLayers.find((layer) => layer.id === id);
+export function selectLayerById(screenId: string, layerId: string) {
+  return (state: EditorState): ScreenLayer | undefined =>
+    selectScreen(screenId)(state)?.layers.find((layer) => layer.id === layerId);
 }
 
 /**
- * Preferred render source for one of the document's image slots.
+ * Ids of a screen's layers, bottom-first.
  *
- * A locally-dropped file keeps its object URL for the whole session, even after
- * it has finished uploading — the bytes are already decoded in memory, and a
- * `blob:` URL can never taint the canvas the way a re-fetched cross-origin URL
- * can. The saved https URL is only used when there is no local file, i.e. after
- * a reload.
+ * Subscribing to the ids alone rather than to the layer objects is what keeps the
+ * canvas granular: adding, removing or restacking a layer re-renders the layer
+ * list, while editing one re-renders only that node.
+ */
+export function selectLayerIds(screenId: string) {
+  return (state: EditorState): string[] =>
+    selectScreen(screenId)(state)?.layers.map((layer) => layer.id) ?? [];
+}
+
+export function selectColorwayFor(spec: DeviceSpec, colorwayId: string): Colorway {
+  return getColorway(spec, colorwayId);
+}
+
+/**
+ * Preferred render source for one of the document's images.
+ *
+ * A locally-dropped file keeps its object URL for the whole session, even after it
+ * has finished uploading — the bytes are already decoded in memory, and a `blob:`
+ * URL can never taint the canvas the way a re-fetched cross-origin URL can. The
+ * saved https URL is only used when there is no local file, i.e. after a reload.
  */
 export function selectImageSource(
   state: EditorState,
-  slot: AssetSlot,
+  key: AssetKey,
   fallbackUrl: string | null,
 ): string | null {
-  return state.assets[slot]?.localUrl ?? fallbackUrl;
+  return state.assets[key]?.localUrl ?? fallbackUrl;
+}
+
+/**
+ * Every image URL one screen draws, for the export pipeline to await.
+ *
+ * Export has to know these up front: `whenAllSettled` blocks until each bitmap is
+ * decoded, and rasterising a frame whose background is still loading silently
+ * produces a half-empty PNG.
+ */
+export function selectScreenImageUrls(
+  state: EditorState,
+  screenId: string,
+): (string | null)[] {
+  const screen = selectScreen(screenId)(state);
+  if (!screen) return [];
+
+  const urls: (string | null)[] = [];
+
+  if (screen.background.type === "image") {
+    urls.push(
+      selectImageSource(
+        state,
+        backgroundAssetKey(screen.id),
+        screen.background.url,
+      ),
+    );
+  }
+
+  for (const layer of screen.layers) {
+    const key = layerAssetKey(screen.id, layer.id);
+
+    if (isDeviceLayer(layer)) {
+      urls.push(selectImageSource(state, key, layer.screenshot.url));
+    } else if (isImageLayer(layer)) {
+      urls.push(selectImageSource(state, key, layer.url));
+    }
+  }
+
+  return urls.filter(Boolean);
+}
+
+/** Opaque fill for formats that cannot store alpha. */
+export function selectOpaqueFallback(
+  state: EditorState,
+  screenId: string,
+): string {
+  const background = selectScreen(screenId)(state)?.background;
+
+  if (background?.type === "color") return background.color;
+  if (background?.type === "gradient") return background.stops[0].color;
+  return "#ffffff";
 }

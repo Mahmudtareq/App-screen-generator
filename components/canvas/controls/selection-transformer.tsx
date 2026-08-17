@@ -4,14 +4,15 @@ import { useEffect, useRef } from "react";
 import type Konva from "konva";
 import { Transformer } from "react-konva";
 
+import { selectLayerById, selectScreen } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
-import { selectionKind } from "@/lib/editor/types";
+import type { LayerKind } from "@/schemas/editor";
 
 /** On-screen size of the handles, in CSS px, regardless of how far the artboard is zoomed out. */
 const ANCHOR_SCREEN_SIZE = 10;
 const BORDER_SCREEN_WIDTH = 1.5;
 
-const ANCHORS_BY_KIND: Record<string, string[]> = {
+const ANCHORS_BY_KIND: Record<LayerKind, string[]> = {
   device: ["top-left", "top-right", "bottom-left", "bottom-right"],
   image: ["top-left", "top-right", "bottom-left", "bottom-right"],
   text: [
@@ -24,11 +25,24 @@ const ANCHORS_BY_KIND: Record<string, string[]> = {
   ],
 };
 
-export function SelectionTransformer({ fitScale }: { fitScale: number }) {
-  const selectedId = useEditorStore((s) => s.selectedId);
-  // Re-attaching when the document changes covers nodes that get remounted by an
-  // edit — swapping the device, or adding a text layer.
-  const doc = useEditorStore((s) => s.doc);
+export function SelectionTransformer({
+  screenId,
+  cardScale,
+}: {
+  screenId: string;
+  cardScale: number;
+}) {
+  // Only this screen's selection matters. Five Stages each mount a Transformer, so
+  // reading the raw selection would have all five re-attach on every click.
+  const selectedLayerId = useEditorStore((s) =>
+    s.screenId === screenId ? s.layerId : null,
+  );
+  const kind = useEditorStore((s) =>
+    selectedLayerId ? selectLayerById(screenId, selectedLayerId)(s)?.kind : undefined,
+  );
+  // Re-attaching when this screen changes covers nodes remounted by an edit —
+  // restacking a layer, or swapping the device.
+  const screen = useEditorStore(selectScreen(screenId));
 
   const ref = useRef<Konva.Transformer>(null);
 
@@ -37,17 +51,15 @@ export function SelectionTransformer({ fitScale }: { fitScale: number }) {
     if (!transformer) return;
 
     const stage = transformer.getStage();
-    const node = selectedId ? stage?.findOne(`#${selectedId}`) : null;
+    const node = selectedLayerId ? stage?.findOne(`#${selectedLayerId}`) : null;
 
     transformer.nodes(node ? [node] : []);
     transformer.getLayer()?.batchDraw();
-  }, [selectedId, doc]);
-
-  const kind = selectionKind(selectedId);
+  }, [selectedLayerId, screen]);
 
   // The Stage is scaled to fit, so handle sizes have to be divided back out or
   // they shrink to nothing on a 2796px-tall artboard.
-  const inverse = fitScale > 0 ? 1 / fitScale : 1;
+  const inverse = cardScale > 0 ? 1 / cardScale : 1;
 
   return (
     <Transformer
