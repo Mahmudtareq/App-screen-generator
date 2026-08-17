@@ -6,6 +6,7 @@ import {
   editorDocSchema,
   isDeviceLayer,
   isImageLayer,
+  plainTextToRuns,
   type EditorDoc,
   type Screen,
   type ScreenLayer,
@@ -89,6 +90,40 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
       screens: [
         { id: newScreenId(), name: "", pinned: false, background, layers },
       ],
+    };
+  },
+
+  /**
+   * v2 → v3: a text layer's plain `text` string becomes an array of styled runs.
+   *
+   * One run carrying the whole string, with no overrides, renders identically to the
+   * uniform Konva Text node it replaces — so a migrated caption looks the same and
+   * only becomes styleable once the user touches it.
+   */
+  2: (doc) => {
+    const screens = Array.isArray(doc.screens) ? doc.screens : [];
+
+    return {
+      ...doc,
+      version: 3,
+      screens: screens.map((screen) => {
+        const value = screen as Record<string, unknown>;
+        const layers = Array.isArray(value.layers) ? value.layers : [];
+
+        return {
+          ...value,
+          layers: layers.map((entry) => {
+            const layer = entry as Record<string, unknown>;
+            if (layer.kind !== "text") return layer;
+
+            const { text, ...rest } = layer;
+            return {
+              ...rest,
+              runs: typeof text === "string" ? plainTextToRuns(text) : [],
+            };
+          }),
+        };
+      }),
     };
   },
 };

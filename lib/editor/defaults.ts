@@ -13,6 +13,7 @@ import { orientSpec } from "@/lib/devices/orientation";
 import type { DeviceSpec, Orientation } from "@/lib/devices/types";
 import {
   EDITOR_DOC_VERSION,
+  plainTextToRuns,
   type Artboard,
   type DeviceLayer,
   type EditorDoc,
@@ -103,7 +104,9 @@ export function createTextLayer(
     locked: false,
     opacity: 1,
     role,
-    text: isTitle ? "Your headline here" : "A short supporting line of copy.",
+    runs: plainTextToRuns(
+      isTitle ? "Your headline here" : "A short supporting line of copy.",
+    ),
     fontId: "inter",
     fontSize: isTitle ? artboard.width * 0.075 : artboard.width * 0.038,
     fontWeight: isTitle ? 700 : 400,
@@ -180,7 +183,7 @@ export function createTemplateScreen(
     layers: [
       createDeviceLayer(spec, artboard, template.colorwayId),
       createTextLayer("title", artboard, {
-        text: copy.title,
+        runs: plainTextToRuns(copy.title),
         fontId,
         color: template.type.titleColor,
         fontWeight: template.type.titleWeight,
@@ -195,7 +198,7 @@ export function createTemplateScreen(
           : null,
       }),
       createTextLayer("body", artboard, {
-        text: copy.body,
+        runs: plainTextToRuns(copy.body),
         fontId,
         color: template.type.bodyColor,
         fontWeight: template.type.bodyWeight,
@@ -262,7 +265,7 @@ export function createBlankScreen(
     layers: [
       createDeviceLayer(spec, doc.artboard, template.colorwayId),
       createTextLayer("title", doc.artboard, {
-        text: "Your headline here",
+        runs: plainTextToRuns("Your headline here"),
         fontId,
         color: template.type.titleColor,
         fontWeight: template.type.titleWeight,

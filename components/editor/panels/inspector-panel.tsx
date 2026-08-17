@@ -53,6 +53,11 @@ export function InspectorPanel({
   const addLayer = useEditorStore((s) => s.addLayer);
   const selectLayer = useEditorStore((s) => s.selectLayer);
 
+  /** This screen's selected layer, or null when the selection is elsewhere. */
+  const selectedLayerId = useEditorStore((s) =>
+    s.screenId === screenId ? s.layerId : null,
+  );
+
   /**
    * Which sections are open, by id.
    *
@@ -61,6 +66,35 @@ export function InspectorPanel({
    */
   const [open, setOpen] = useState<string | null>("layers");
   const [expandedLayerId, setExpandedLayerId] = useState<string | null>(null);
+  const [lastSelectedLayerId, setLastSelectedLayerId] = useState<string | null>(
+    null,
+  );
+
+  /**
+   * Selecting a layer on the canvas opens its row, and closes whichever was open.
+   *
+   * Without this the two halves drift apart: clicking a caption on the canvas set
+   * the store's selection and highlighted the row, but the row stayed collapsed —
+   * so the controls for the thing you just clicked were one more click away, and
+   * the panel looked like it had ignored you.
+   *
+   * Synced during render rather than in an effect, so the row is already open in
+   * the same commit that draws the selection ring; an effect would paint the
+   * highlight first and expand a frame later, which reads as a flicker.
+   *
+   * Comparing against the *last seen* selection rather than assigning
+   * unconditionally is what leaves the chevron working: collapsing an expanded row
+   * by hand does not change the selection, so nothing here fights it back open.
+   */
+  if (selectedLayerId !== lastSelectedLayerId) {
+    setLastSelectedLayerId(selectedLayerId);
+    if (selectedLayerId) {
+      setExpandedLayerId(selectedLayerId);
+      // A layer selected while the Background section was open would otherwise
+      // expand out of sight.
+      setOpen("layers");
+    }
+  }
 
   if (!screen) return null;
 

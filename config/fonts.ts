@@ -74,3 +74,23 @@ export function getCanvasFont(id: CanvasFontId): CanvasFont {
 export function resolveFontFamily(id: string): string {
   return (FONT_LOOKUP[id as CanvasFontId] ?? FONT_LOOKUP[DEFAULT_FONT_ID]).family;
 }
+
+/**
+ * The weight a **bold run** paints at: the lightest weight this family offers that
+ * is both at least 700 and heavier than the caption's own weight.
+ *
+ * Bold is relative rather than a fixed 700 because the base weight is already a
+ * deliberate choice — bolding a word inside a 700 headline has to reach 800 to read
+ * as emphasis at all, and 700 would be a no-op. Where the family has nothing heavier
+ * to give (Poppins stops at 700) the base weight comes back unchanged, so the run
+ * simply looks the same rather than falling back to a synthesised faux-bold.
+ */
+export function resolveBoldWeight(id: string, baseWeight: number): number {
+  const { weights } = FONT_LOOKUP[id as CanvasFontId] ?? FONT_LOOKUP[DEFAULT_FONT_ID];
+
+  return (
+    weights.find((weight) => weight >= 700 && weight > baseWeight) ??
+    [...weights].reverse().find((weight) => weight > baseWeight) ??
+    baseWeight
+  );
+}

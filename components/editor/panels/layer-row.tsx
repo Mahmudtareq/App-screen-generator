@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   AlignCenterHorizontal,
   ArrowDown,
@@ -75,6 +76,24 @@ export function LayerRow({
   const Icon = KIND_ICONS[layer.kind];
   const isDevice = isDeviceLayer(layer);
 
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Bring a row into view as it opens.
+   *
+   * An expanded device panel is tall enough to push the rows below it out of the
+   * scroll area, so a layer selected on the canvas could open somewhere the user
+   * cannot see — which looks identical to not opening at all.
+   *
+   * `nearest` on both axes so this only scrolls when it has to: `inline` matters
+   * because the inspector sits inside the horizontally scrolling filmstrip, and a
+   * stronger alignment would drag the whole strip sideways on every click.
+   */
+  useEffect(() => {
+    if (!expanded) return;
+    rowRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [expanded]);
+
   const position =
     index === total - 1
       ? `layer ${index + 1} (top)`
@@ -84,6 +103,7 @@ export function LayerRow({
 
   return (
     <div
+      ref={rowRef}
       data-testid="layer-row"
       className={cn(
         "rounded-xl border bg-card transition-colors",

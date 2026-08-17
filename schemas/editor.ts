@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 2;
+export const EDITOR_DOC_VERSION = 3;
 
 const hexColorSchema = z
   .string()
@@ -180,12 +180,58 @@ export const imageLayerSchema = z.object({
   cornerRadius: z.number().min(0).default(0),
 });
 
+/**
+ * One stretch of text sharing a style — the unit that makes "colour just this word"
+ * possible.
+ *
+ * Only the properties that can vary *within* a line live here. Font family and size
+ * stay on the layer, which is a deliberate limit rather than an oversight: uniform
+ * size means every line has one baseline and one line height, which is what keeps the
+ * layout pass in `lib/canvas/rich-text.ts` tractable and its wrap points identical
+ * between preview and export.
+ *
+ * `null` means "inherit from the layer" for colour, and "none" for highlight, so a
+ * run carrying no overrides round-trips through the editor unchanged.
+ */
+/**
+ * Caps on the run array.
+ *
+ * Exported because the editor has to *enforce* them rather than discover them:
+ * a document that fails its own schema is dropped whole on reload, so the
+ * tiptap-to-runs conversion coalesces and truncates against these numbers instead
+ * of handing zod something it will reject.
+ */
+export const MAX_TEXT_RUNS = 64;
+export const MAX_RUN_LENGTH = 2000;
+
+export const textRunSchema = z.object({
+  text: z.string().max(MAX_RUN_LENGTH),
+  bold: z.boolean().default(false),
+  italic: z.boolean().default(false),
+  underline: z.boolean().default(false),
+  /**
+   * Casing, per run, so a headline can shout one word.
+   *
+   * The layer keeps a flag of the same name for the whole caption; the two are
+   * OR-ed at render time like italic and underline. Casing is a run property at
+   * all — rather than something applied to the finished string — because Konva has
+   * no `text-transform` and the document has to keep the original either way.
+   */
+  uppercase: z.boolean().default(false),
+  color: hexColorSchema.nullable().default(null),
+  highlight: hexColorSchema.nullable().default(null),
+});
+
 export const textLayerSchema = z.object({
   ...layerBaseFields,
   kind: z.literal("text"),
   /** Drives default size and placement only; it is not a style lock. */
   role: z.enum(["title", "body"]),
-  text: z.string().max(2000).default(""),
+  /**
+   * The copy, as styled runs. A plain caption is a single run; `\n` inside a run's
+   * text is a hard line break.
+   */
+  runs: z.array(textRunSchema).max(MAX_TEXT_RUNS).default([]),
   fontId: z.enum(CANVAS_FONT_IDS).default(DEFAULT_FONT_ID),
   /** Artboard px — the same unit as x/y, so inspector controls need no conversion. */
   fontSize: z.number().min(1).max(1024),
@@ -245,6 +291,7 @@ export type LayerKind = ScreenLayer["kind"];
 export type DeviceLayer = z.infer<typeof deviceLayerSchema>;
 export type ImageLayer = z.infer<typeof imageLayerSchema>;
 export type TextLayer = z.infer<typeof textLayerSchema>;
+export type TextRun = z.infer<typeof textRunSchema>;
 export type Artboard = z.infer<typeof artboardSchema>;
 export type Background = z.infer<typeof backgroundSchema>;
 export type BackgroundType = Background["type"];
@@ -291,4 +338,21 @@ export function layerLabel(layer: ScreenLayer): string {
 /** Screen name for the strip, falling back to its 1-based position. */
 export function screenLabel(screen: Screen, index: number): string {
   return screen.name || `Screen ${index + 1}`;
+}
+
+/* -------------------------------- text runs -------------------------------- */
+
+/** A run carrying no styling of its own — what a plain string becomes. */
+export const PLAIN_RUN: Omit<TextRun, "text"> = {
+  bold: false,
+  italic: false,
+  underline: false,
+  uppercase: false,
+  color: null,
+  highlight: null,
+};
+
+/** A single unstyled run — the shape a plain string becomes. */
+export function plainTextToRuns(text: string): TextRun[] {
+  return text ? [{ ...PLAIN_RUN, text }] : [];
 }

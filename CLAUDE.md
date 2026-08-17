@@ -63,6 +63,10 @@ text layers are a discriminated union on `kind`, narrowed with `isDeviceLayer` /
 chains. The background is *not* a layer: it is always behind everything and is
 the one thing the export pipeline hides on its own. Device model, orientation and
 artboard are document-level, because five frames of one listing have to agree.
+A text layer's copy is an ordered array of styled *runs* for the same reason, and
+Konva cannot lay that out — [lib/canvas/rich-text.ts](lib/canvas/rich-text.ts) owns
+every wrap point and fragment position, and preview and export share it. Read
+FEATURES.md C6 before touching text rendering.
 
 **3. One image path onto the canvas.** [lib/canvas/image-cache.ts](lib/canvas/image-cache.ts)
 fetches every image as a Blob and renders it from a same-origin `blob:` URL.

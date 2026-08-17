@@ -386,6 +386,12 @@ the top — because something just added should be visible, not buried behind th
 
 `moveLayer` supports `up` / `down` / `top` / `bottom`; only up and down have UI.
 
+Selecting a layer *on the canvas* opens its row and closes whichever was open —
+`InspectorPanel` syncs `expandedLayerId` to the store selection during render, and the
+row scrolls itself into view. The sync compares against the last seen selection rather
+than assigning unconditionally, which is what leaves the chevron free to collapse a row
+by hand without it springing back open.
+
 **Status: 🟡**
 
 **Backlog**
@@ -394,6 +400,8 @@ the top — because something just added should be visible, not buried behind th
   the store supporting them.
 - Only one layer row expands at a time, and only one section (`Layouts & Elements` or
   `Background`). Fine at three layers, cramped at ten.
+- A tall panel (device, text) fills the whole scroll area, so the sibling rows are
+  scrolled out of sight rather than visible above and below it.
 - No layer renaming UI, though `name` exists on every layer and `layerLabel` already
   prefers it.
 - Adding a layer offers image and text only. A second device per screen is possible in
@@ -529,40 +537,138 @@ Open to anonymous users on purpose, with a per-instance rate limit of 6 per minu
 
 ### C6. Title & subtitle (text layer)
 
-**What it is.** Captions on the artboard, optionally on a filled pill.
+**What it is.** Captions on the artboard, optionally on a filled pill. The copy is
+rich text: a word can be bolder, a different colour, or sitting on a highlight.
 
 **Files**
 
 - [components/canvas/nodes/text-node.tsx](components/canvas/nodes/text-node.tsx)
+- [lib/canvas/rich-text.ts](lib/canvas/rich-text.ts) — the layout pass
+- [components/editor/panels/rich-text-editor.tsx](components/editor/panels/rich-text-editor.tsx)
+- [lib/editor/rich-text.ts](lib/editor/rich-text.ts) — runs ↔ tiptap
+- [lib/editor/uppercase-mark.ts](lib/editor/uppercase-mark.ts) — the one custom mark
+- [components/editor/panels/emoji-picker.tsx](components/editor/panels/emoji-picker.tsx)
+  and [config/emoji.ts](config/emoji.ts)
 - [components/editor/panels/text-layer-panel.tsx](components/editor/panels/text-layer-panel.tsx)
-- `textLayerSchema` in [schemas/editor.ts](schemas/editor.ts)
+- `textLayerSchema` / `textRunSchema` in [schemas/editor.ts](schemas/editor.ts)
 
 **How it works.** `role` is `title` or `body`, and drives default size and placement
-only — it is not a style lock. Controls: text, font, weight, size, align, colour,
+only — it is not a style lock. Controls: copy, font, weight, size, align, colour,
 italic/underline/uppercase, line height, letter spacing, opacity, rotation, drop
 shadow, and a background pill.
 
-Two mechanics worth knowing before editing this file:
+The copy is an array of **runs** rather than a string. Each run is a stretch of text
+that shares a style, and only what can vary *within* a line lives on it — bold,
+italic, underline, colour, highlight. Font family and size stay on the layer, which
+is a deliberate limit: uniform size means one baseline and one line height per line,
+which is what keeps the layout below tractable.
 
-- **The pill is measured, not stored.** It is sized imperatively from the text's
-  rendered bounds in a `useLayoutEffect`, using `getTextWidth()` (the widest line) not
-  `width()` (the wrap box). Doing it through React state would render twice per
-  keystroke and show a stale pill behind fresh text.
-- **Uppercase is applied to the string at render time**, because Konva has no
-  `text-transform`. The document keeps the original, so toggling back is lossless.
+Five mechanics worth knowing before editing any of this:
+
+- **Style resolution is additive.** The layer carries the caption's own font, size,
+  colour, italic, underline and casing; a run only adds. Bold means *heavier than the
+  base weight* (`resolveBoldWeight`), not 700 — bolding a word in a 700 headline has
+  to reach 800 to read as emphasis, and Poppins, which stops at 700, correctly has
+  nothing to give. Italic, underline and uppercase turn on but never off; colour
+  overrides where set and inherits where null. That asymmetry is what keeps the
+  caption-wide controls meaning "the whole caption" after a word has been styled by
+  hand.
+- **Layout is ours, not Konva's.** A Konva `Text` node paints one style, so a styled
+  caption is several nodes — which makes wrap points, fragment x and the widest line
+  our problem. `layoutRichText` does all of it, using the same measurement formula as
+  Konva's `Text._getTextWidth` so a fragment placed at x is where Konva then draws it.
+  Preview and export render from that one layout, which is what makes their line
+  breaks identical by construction rather than by luck.
+- **Fragments are baseline-corrected.** Konva puts a line's baseline at
+  `(ascent - descent) / 2` below the node top, measured from the font in use, and two
+  weights of one family can disagree — Poppins ships 400 and 700 as separate files.
+  Each fragment is shifted by the difference against the caption's own style, so a
+  mixed-weight headline sits on one baseline. It costs nothing when the metrics agree.
+- **The pill is computed, not measured.** It comes straight out of the layout. This
+  replaced a `useLayoutEffect` that sized it from the mounted node's rendered bounds,
+  which meant one frame of a fresh string behind a stale pill on every keystroke.
+- **Uppercase is applied to the string during layout**, because Konva has no
+  `text-transform`. The document keeps the original, so toggling back is lossless —
+  and it happens before the wrap pass rather than at paint time, because upper-casing
+  changes how wide a word measures and so where the line breaks.
+
+**Editing.** The panel field is tiptap. That document lives only inside
+`RichTextEditor` — runs go in, runs come out, and `lib/editor/rich-text.ts` owns both
+directions. Persisting the ProseMirror tree instead would put an editor's internal
+schema in `Project.doc` and hand every future migration a tree to walk. The
+conversion is lossy on purpose: a paste's headings, lists and links arrive as plain
+text, which is right for copy with one size and one alignment.
+
+**Where the controls live.** Everything that styles *text* is in the editor's own
+toolbar. A divider separates it from alignment, which is the one control with no
+per-run meaning at all — a line is aligned as a whole, so a selection has nothing to
+scope it to.
+
+Colour and uppercase read their scope from the selection: with words selected they
+set a run, with nothing selected they move the caption's own value, which is what the
+panel below used to duplicate as separate fields. That is what makes "uppercase this
+word" and "uppercase everything" one button instead of two that look identical and
+disagree.
+
+Size, line height and letter spacing are typed rather than dragged, because they are
+values people arrive knowing; opacity and rotation stay sliders, because they are
+values people arrive only knowing they want *less* of.
+
+**Emoji** are a curated static list in [config/emoji.ts](config/emoji.ts), painted as
+plain text, rather than a picker library. Every picker worth installing renders its
+grid from Apple or Twemoji artwork on a CDN, and what lands in the document is a
+*character* the canvas then draws in whatever emoji font the machine has — so picking
+from images would mean choosing one glyph and exporting a different one. It also
+keeps the editor working with no network, which the rest of an anonymous local draft
+already does. Recents live in localStorage, not `doc`: they belong to the person, and
+in the document they would make inserting an emoji an undo step.
+
+Emoji are also why the layout counts **graphemes** rather than `String.length`. One
+is two UTF-16 units, a ZWJ family is eleven, so the old count over-charged letter
+spacing and the mid-word break could slice a surrogate pair in half. `Intl.Segmenter`
+does both jobs, and is skipped entirely at zero letter spacing — the default, and the
+case where the count cannot change the answer.
+
+Three things about the runs ↔ tiptap boundary:
+
+- **It enforces the schema's caps rather than discovering them.** A document that
+  fails its own schema is dropped whole on reload, so `normalizeRuns` coalesces
+  adjacent same-style runs first and, past `MAX_TEXT_RUNS`, flattens the tail's
+  styling instead of dropping its words.
+- **Pasted colours are parsed or discarded.** `rgb(...)` is converted, anything else
+  becomes null. One unparseable colour would otherwise fail `hexColorSchema` and take
+  the whole draft with it.
+- **The editor has no undo of its own.** `undoRedo` is off, because
+  `useEditorShortcuts` deliberately routes ⌘Z to the document even while a field has
+  focus — two undo stacks would fight over the same keystroke.
 
 **Status: 🟡**
 
 **Backlog**
 
-- **No on-canvas text editing** — copy is edited only in the panel textarea.
+- **No on-canvas text editing** — copy is edited only in the panel field.
 - Four self-hosted fonts (Inter, Poppins, Montserrat, Playfair). A Google Fonts picker
   is Phase 3 and extends the existing registry rather than replacing it.
-- No per-word or per-run styling, so the reference design's highlighted-phrase headline
-  (part of the title on a coloured pill) cannot be reproduced. Would need rich text or
-  a second stacked layer.
+- **Bold is a visible no-op on Poppins at weight 700**, which is the template default
+  for titles. Correct per `resolveBoldWeight` — there is no heavier file — but it
+  looks like a broken button. Needs either a heavier Poppins or a disabled control.
+- Applying a template restyles the layer's base colour and leaves run colours alone,
+  so a hand-coloured word survives a restyle that changes everything around it. The
+  conservative choice; the alternative silently discards deliberate work.
+- Run styling is bold/italic/underline/uppercase/colour/highlight. Per-run size and
+  font are out by design — see the uniform-size note above.
+- Uppercase is the one mark with no tiptap extension behind it;
+  [lib/editor/uppercase-mark.ts](lib/editor/uppercase-mark.ts) is a nine-line
+  `Mark.create`. Lowercase and small-caps would extend it, not replace it.
+- The emoji list is a few hundred entries, not the full Unicode set — search covers
+  intent, but a specific missing glyph has to be pasted in. Skin-tone and gender
+  variants are absent for the same reason.
+- Emoji export in colour because the browser has a colour emoji font. A machine
+  without one exports the monochrome fallback, and nothing warns about it.
+- A highlight spans the full line box, like a CSS background on an inline span. No
+  padding or corner radius of its own.
 - Vertical alignment and auto-fit-to-box are absent.
-- Max 2000 characters, 20-ish layers in practice.
+- Max 2000 characters per run, 64 runs per caption, 20-ish layers in practice.
 
 ---
 
