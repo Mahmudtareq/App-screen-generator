@@ -1,7 +1,5 @@
 "use client";
 
-import { useId } from "react";
-
 import { ColorPicker } from "@/components/common/color-picker";
 import { NumberInput } from "@/components/common/number-input";
 import { FontPickerField } from "@/components/editor/fonts/font-picker-field";
@@ -13,11 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { nearestWeight, resolveFont, resolveFontFamily } from "@/config/fonts";
 import { useEditorStore } from "@/lib/editor/store";
 import type { TextLayer } from "@/schemas/editor";
 
+import { EffectToggle } from "./effect-toggle";
 import { Field } from "./panel-section";
 import { RichTextEditor } from "./rich-text-editor";
 
@@ -191,36 +189,6 @@ export function TextLayerPanel({
       <ShadowControls layer={layer} patch={patch} />
       <PillControls layer={layer} patch={patch} />
     </div>
-  );
-}
-
-/**
- * A switch with its whole card as the hit target.
- *
- * The association is explicit rather than left to the label's first labelable
- * descendant, which is what a bare wrapper would rely on: that rule silently picks a
- * different control the moment anything else clickable joins the card, and the
- * failure is a padding area that quietly stops working.
- */
-function EffectToggle({
-  label,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  const id = useId();
-
-  return (
-    <label
-      htmlFor={id}
-      className="flex flex-1 cursor-pointer items-center justify-between gap-2 rounded-md border p-3"
-    >
-      <span className="text-xs font-medium">{label}</span>
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
-    </label>
   );
 }
 

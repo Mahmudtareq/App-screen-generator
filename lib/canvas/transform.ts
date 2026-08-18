@@ -14,73 +14,85 @@ import type { TransformPatch } from "@/lib/editor/types";
  *
  * This lives in one place on purpose. Doing it ad hoc inside each canvas
  * component is how the drift gets reintroduced.
+ *
+ * There is one function per node *shape* rather than one with a `kind` switch,
+ * because the shapes genuinely differ in what they can report: text and image
+ * layers are Groups holding a transparent box, and a Group reports no size of its
+ * own, so the current values have to be passed in from the document.
  */
 
 const MIN_SIZE = 8;
 const MIN_FONT_SIZE = 4;
 const MIN_DEVICE_SCALE = 0.01;
 
-export type TransformKind = "device" | "image";
+/** Scale off the node, so the caller only has to fold it into its own units. */
+function takeScale(group: Konva.Node): { x: number; y: number } {
+  const scale = { x: group.scaleX(), y: group.scaleY() };
+
+  group.scaleX(1);
+  group.scaleY(1);
+
+  return scale;
+}
+
+function position(node: Konva.Node) {
+  return { x: node.x(), y: node.y(), rotation: node.rotation() };
+}
 
 /**
- * Text layers are a Group (pill + text), so the Transformer scales the Group
- * while the values that mean "size" live on the layer: `width` is the wrapping
- * box and `fontSize` is the type size. Both are passed in rather than read off
- * the node, because a Group reports neither.
+ * A text layer's size lives in two properties: `width` is the wrapping box and
+ * `fontSize` is the type size, so a horizontal drag rewraps and a vertical one
+ * resizes the type.
  */
 export function normalizeTextTransform(
   group: Konva.Node,
   current: { width: number; fontSize: number },
 ): TransformPatch {
-  const scaleX = group.scaleX();
-  const scaleY = group.scaleY();
-
-  group.scaleX(1);
-  group.scaleY(1);
+  const scale = takeScale(group);
 
   return {
-    x: group.x(),
-    y: group.y(),
-    rotation: group.rotation(),
-    width: Math.max(MIN_SIZE, current.width * scaleX),
-    fontSize: Math.max(MIN_FONT_SIZE, current.fontSize * scaleY),
+    ...position(group),
+    width: Math.max(MIN_SIZE, current.width * scale.x),
+    fontSize: Math.max(MIN_FONT_SIZE, current.fontSize * scale.y),
   };
 }
 
-export function normalizeTransform(
-  node: Konva.Node,
-  kind: TransformKind,
+/**
+ * An image layer's size is its box.
+ *
+ * The bitmap inside is positioned by `placeImage` and is not what the handles
+ * measure — resizing changes the frame the image is fitted into, which is the only
+ * reading under which `fit` and `align` keep meaning anything.
+ */
+export function normalizeBoxTransform(
+  group: Konva.Node,
+  current: { width: number; height: number },
 ): TransformPatch {
-  const scaleX = node.scaleX();
-  const scaleY = node.scaleY();
-
-  const base = {
-    x: node.x(),
-    y: node.y(),
-    rotation: node.rotation(),
-  };
-
-  if (kind === "device") {
-    // The device Group's scale *is* a document property, so the Transformer's
-    // scale is kept rather than baked away. Transformer runs with keepRatio, so
-    // the two axes agree; average them to be safe against float drift.
-    return {
-      ...base,
-      scale: Math.max(MIN_DEVICE_SCALE, (scaleX + scaleY) / 2),
-    };
-  }
-
-  node.scaleX(1);
-  node.scaleY(1);
+  const scale = takeScale(group);
 
   return {
-    ...base,
-    width: Math.max(MIN_SIZE, node.width() * scaleX),
-    height: Math.max(MIN_SIZE, node.height() * scaleY),
+    ...position(group),
+    width: Math.max(MIN_SIZE, current.width * scale.x),
+    height: Math.max(MIN_SIZE, current.height * scale.y),
+  };
+}
+
+/**
+ * A device Group's scale *is* a document property, so the Transformer's scale is
+ * kept rather than baked away into a width.
+ */
+export function normalizeDeviceTransform(group: Konva.Node): TransformPatch {
+  // keepRatio is on for devices, so the two axes agree; averaging is insurance
+  // against float drift rather than a real disagreement.
+  const scale = (group.scaleX() + group.scaleY()) / 2;
+
+  return {
+    ...position(group),
+    scale: Math.max(MIN_DEVICE_SCALE, scale),
   };
 }
 
 /** Position-only commit, for a plain drag where no scaling happened. */
 export function dragPatch(node: Konva.Node): TransformPatch {
-  return { x: node.x(), y: node.y(), rotation: node.rotation() };
+  return position(node);
 }

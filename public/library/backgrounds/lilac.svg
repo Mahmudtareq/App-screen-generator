@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600" fill="none">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ede9fe"/><stop offset="1" stop-color="#c7d2fe"/></linearGradient><filter id="b" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="180"/></filter></defs>
+  <rect width="1200" height="1600" fill="url(#g)"/>
+  <circle cx="350" cy="450" r="400" fill="#ddd6fe" opacity="0.75" filter="url(#b)"/>
+  <circle cx="880" cy="1200" r="420" fill="#a5b4fc" opacity="0.6" filter="url(#b)"/>
+
+</svg>

@@ -14,7 +14,19 @@ const BORDER_SCREEN_WIDTH = 1.5;
 
 const ANCHORS_BY_KIND: Record<LayerKind, string[]> = {
   device: ["top-left", "top-right", "bottom-left", "bottom-right"],
-  image: ["top-left", "top-right", "bottom-left", "bottom-right"],
+  // Images get all eight, because an image layer's box is a *frame* the artwork is
+  // fitted into rather than the artwork itself: reshaping it to a tall banner or a
+  // square badge is the whole point of `fit`, and that needs an edge handle.
+  image: [
+    "top-left",
+    "top-center",
+    "top-right",
+    "middle-left",
+    "middle-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+  ],
   text: [
     "middle-left",
     "middle-right",
@@ -65,7 +77,11 @@ export function SelectionTransformer({
     <Transformer
       ref={ref}
       rotateEnabled
-      keepRatio={kind !== "text"}
+      // Only a device must keep its ratio — its scale is a single document
+      // property, and a squashed phone is never what anyone meant. An image is
+      // free to be reframed because `fit` decides what happens to the artwork
+      // inside, and the default (`contain`) cannot distort it.
+      keepRatio={kind === "device"}
       enabledAnchors={kind ? ANCHORS_BY_KIND[kind] : []}
       anchorSize={ANCHOR_SCREEN_SIZE * inverse}
       anchorStrokeWidth={1 * inverse}

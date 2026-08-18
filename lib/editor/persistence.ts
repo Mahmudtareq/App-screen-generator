@@ -137,6 +137,46 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * resolve, rather than letting it fail the enum parse and drop the draft whole.
    */
   3: (doc) => ({ ...doc, version: 4 }),
+
+  /**
+   * v4 → v5: an image layer gains `fit` and `align`.
+   *
+   * Every v4 image box already matched its bitmap's aspect ratio — the panel's size
+   * slider drives height from width, the canvas Transformer resizes images with
+   * `keepRatio`, and an artboard retarget scales both axes uniformly. So `contain`
+   * renders a migrated layer identically to the stretch-to-box it replaces, and the
+   * field only starts to matter once someone changes the box deliberately.
+   */
+  4: (doc) => {
+    const screens = Array.isArray(doc.screens) ? doc.screens : [];
+
+    return {
+      ...doc,
+      version: 5,
+      screens: screens.map((screen) => {
+        const value = screen as Record<string, unknown>;
+        const layers = Array.isArray(value.layers) ? value.layers : [];
+
+        return {
+          ...value,
+          layers: layers.map((entry) => {
+            const layer = entry as Record<string, unknown>;
+            if (layer.kind !== "image") return layer;
+            return { fit: "contain", align: "center", ...layer };
+          }),
+        };
+      }),
+    };
+  },
+
+  /**
+   * v5 → v6: an image layer gains `tint`.
+   *
+   * `null` is "no tint", which is exactly what every v5 layer was doing, so this
+   * only stamps the version — the field's absence and its null are the same
+   * picture.
+   */
+  5: (doc) => ({ ...doc, version: 6 }),
 };
 
 /**

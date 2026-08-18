@@ -4,7 +4,7 @@ import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Group } from "react-konva";
 
-import { dragPatch, normalizeTransform } from "@/lib/canvas/transform";
+import { dragPatch, normalizeDeviceTransform } from "@/lib/canvas/transform";
 import {
   selectColorwayFor,
   selectImageSource,
@@ -65,7 +65,7 @@ export function DeviceNode({
     commitTransform(
       screenId,
       layerId,
-      normalizeTransform(e.target as Konva.Node, "device"),
+      normalizeDeviceTransform(e.target as Konva.Node),
     );
   };
 

@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 4;
+export const EDITOR_DOC_VERSION = 6;
 
 const hexColorSchema = z
   .string()
@@ -167,6 +167,31 @@ export const deviceLayerSchema = z.object({
   screenshot: screenshotSchema,
 });
 
+/**
+ * How the bitmap sits inside the layer's box.
+ *
+ * The box is the thing the user drags and the Transformer measures; the bitmap has
+ * an aspect ratio of its own that need not match it. `contain` is the default
+ * because it is the only one that can never distort artwork — a stretched logo is
+ * the kind of mistake that ships.
+ */
+export const imageFitSchema = z.enum(["contain", "cover", "fill"]);
+
+/** Where a `contain`ed image sits, or which part of a `cover`ed one survives. */
+export const imageAlignSchema = z.enum(["top", "center", "bottom"]);
+
+/**
+ * A colour painted over the image's own pixels, transparency respected.
+ *
+ * Kept as colour *plus strength* rather than a bare hex, because the two ends of the
+ * range are both wanted: at 1 a transparent logo becomes a flat silhouette in the
+ * brand colour, and at 0.3 a photo takes on a wash without losing its subject.
+ */
+export const imageTintSchema = z.object({
+  color: hexColorSchema,
+  strength: z.number().min(0).max(1).default(1),
+});
+
 export const imageLayerSchema = z.object({
   ...layerBaseFields,
   kind: z.literal("image"),
@@ -178,6 +203,10 @@ export const imageLayerSchema = z.object({
   height: z.number().min(1).max(ARTBOARD_MAX),
   rotation: z.number().min(-360).max(360).default(0),
   cornerRadius: z.number().min(0).default(0),
+  fit: imageFitSchema.default("contain"),
+  /** Vertical only: horizontal stays centred, which is what a badge or logo wants. */
+  align: imageAlignSchema.default("center"),
+  tint: imageTintSchema.nullable().default(null),
 });
 
 /**
@@ -299,6 +328,9 @@ export type ScreenLayer = z.infer<typeof screenLayerSchema>;
 export type LayerKind = ScreenLayer["kind"];
 export type DeviceLayer = z.infer<typeof deviceLayerSchema>;
 export type ImageLayer = z.infer<typeof imageLayerSchema>;
+export type ImageFit = z.infer<typeof imageFitSchema>;
+export type ImageAlign = z.infer<typeof imageAlignSchema>;
+export type ImageTint = z.infer<typeof imageTintSchema>;
 export type TextLayer = z.infer<typeof textLayerSchema>;
 export type TextRun = z.infer<typeof textRunSchema>;
 export type Artboard = z.infer<typeof artboardSchema>;

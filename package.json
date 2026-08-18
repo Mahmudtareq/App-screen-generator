@@ -10,6 +10,7 @@
     "lint:fix": "eslint --fix",
     "type-check": "tsc --noEmit",
     "sync-indexes": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/sync-indexes.ts",
+    "fetch-store-badges": "tsx scripts/fetch-store-badges.ts",
     "dev:db": "tsx scripts/dev-mongo.ts"
   },
   "dependencies": {

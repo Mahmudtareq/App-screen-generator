@@ -157,6 +157,9 @@ export function createImageLayer(
     height,
     rotation: 0,
     cornerRadius: 0,
+    fit: "contain",
+    align: "center",
+    tint: null,
   };
 }
 

@@ -42,6 +42,7 @@ The build is the canary that Konva has not leaked into the server bundle.
 | [C5](#c5-website-url-capture) | Website URL capture | 🟡 | Layers |
 | [C6](#c6-title--subtitle-text-layer) | Title & subtitle (text layer) | 🟡 | Layers |
 | [C7](#c7-image-layer) | Image layer | ✅ | Layers |
+| [C8](#c8-image-picker) | Image picker | ✅ | Layers |
 | [D1](#d1-background) | Background | 🟡 | Appearance |
 | [E1](#e1-templates) | Templates | 🟡 | Project |
 | [E2](#e2-device-catalog--orientation) | Device catalog & orientation | 🟡 | Project |
@@ -683,16 +684,55 @@ single logo slot.
 
 - [components/canvas/nodes/image-node.tsx](components/canvas/nodes/image-node.tsx)
 - [components/editor/panels/image-layer-panel.tsx](components/editor/panels/image-layer-panel.tsx)
+- [lib/canvas/object-fit.ts](lib/canvas/object-fit.ts) — `placeImage`
+- [lib/canvas/tint.ts](lib/canvas/tint.ts) — the tinted-bitmap cache
 - `imageLayerSchema` in [schemas/editor.ts](schemas/editor.ts)
+- Picker: [components/editor/images/](components/editor/images/) — see [C8](#c8-image-picker)
 
 **How it works.** Any number per screen, anywhere in the stack — a badge behind the
 device and a sticker in front of it are the same component twice, differing only in
-where they sit in `layers`. Controls: image, size (aspect-locked in the panel, free on
-canvas), opacity, rotation, corner radius.
+where they sit in `layers`. Controls: image, fit, vertical position, tint, and typed
+fields for size (aspect-locked in the panel, free on canvas), opacity, rotation and
+corner radius — every one of those is a value people arrive with a number for, and a
+slider makes hitting it an exercise in aim.
+
+The layer is a **box, and a bitmap fitted inside it** — a Group holding a transparent
+Rect plus the image, the same shape a text layer has. That separation is what `fit`
+needs to exist: the box is what gets dragged, hit-tested and resized, while the artwork
+is free to be letterboxed (`contain`), cropped (`cover`) or stretched (`fill`) within
+it. `placeImage` is the single answer to "so where do the pixels go", read by the one
+node that both preview and export render — the alternative, a node that positions the
+image and a second place that reasons about it, is how a logo ends up centred on screen
+and off-centre in the PNG.
+
+`contain` is the default because it is the only fit that cannot distort artwork.
+That default is load-bearing: images resize *freely* on canvas (only a device keeps its
+ratio), so the box routinely stops matching the bitmap, and a stretched logo is the kind
+of mistake that ships.
 
 Nothing is drawn until an image is chosen: a placeholder rectangle would end up in an
 export the moment someone forgot to fill it in. On accept, the box is re-shaped to the
 decoded bitmap's real aspect ratio.
+
+**Tint is applied to the source bitmap, not to the node.** Konva can do it with
+`Konva.Filters.RGB`, and that is the wrong tool: a filtered node must be `cache()`d,
+and a cached node rasterises at the resolution it was cached at — so the export's 3×
+pixel ratio would upscale that cache and land softer than the untinted layer beside it.
+`tintedBitmap` paints the colour onto a copy of the source with `source-atop`, which
+keeps the natural resolution *and* respects transparency: a logo's cut-outs stay cut
+out and its antialiased edges blend instead of turning into a hard silhouette. Colour
+and strength are stored separately because the two ends of the range are different
+features — 100% makes a transparent logo a flat silhouette in the brand colour, 30%
+washes a photo without hiding its subject. The inspector thumbnail reads from the same
+cache — passing the same box size, so it shares the node's copy rather than tinting the
+bitmap twice — and therefore cannot disagree with the canvas about what colour the layer
+is.
+
+The cache is bounded by *pixels*, not by entry count, and each copy is only as large as
+the layer needs at 3×. Both matter because a colour wheel writes a new tint on every
+pointer move: twenty entries is a meaningless budget when one of them is a 1200×1600
+backdrop, and a 26fps drag on a canvas that is quietly holding 180MB of stale copies
+looks exactly like a canvas that has stopped updating.
 
 **Status: ✅**
 
@@ -701,8 +741,106 @@ decoded bitmap's real aspect ratio.
 - No SVG support — `ACCEPTED_IMAGE_TYPES` is PNG/JPG/WebP, so the panel's
   "transparent PNG works best" hint is the whole story. SVG would need rasterising
   before it reaches the canvas.
-- No flip, no tint, no border, no blend modes.
+- Horizontal alignment is fixed to centre; only the vertical axis is exposed.
+- No flip, no border, no blend modes.
+- Tint is a flat colour. No gradient overlay, and no per-layer duotone.
 - No shape primitives (rect, circle, blob) — every decoration has to be an upload.
+
+---
+
+### C8. Image picker
+
+**What it is.** The dialog behind "Select image" — tabbed sources for where an image
+comes from.
+
+**Files**
+
+- [components/editor/images/image-picker-dialog.tsx](components/editor/images/image-picker-dialog.tsx) — the frame
+- [components/editor/images/image-sources.ts](components/editor/images/image-sources.ts) — the registry
+- [components/editor/images/sources/](components/editor/images/sources/) — one file per source
+- [config/image-library.ts](config/image-library.ts) — the built-in artwork, and how to add to it
+- [public/library/](public/library/) — the artwork itself
+- [lib/editor/rasterize.ts](lib/editor/rasterize.ts) — SVG → PNG at pick time
+- [hooks/use-image-pick.ts](hooks/use-image-pick.ts), [lib/editor/image-picks.ts](lib/editor/image-picks.ts)
+
+**How it works.** Two pieces, deliberately: the dialog owns the frame (tabs, scrolling,
+closing on a pick) and knows nothing about what any tab does, while `IMAGE_SOURCES` is
+the list of tabs. Adding a source is one component and one line in that array; removing
+one is a deleted line. Nothing else changes, which is the point — the sources worth
+adding next (a stock library, a search API behind a key) differ from these only in where
+the bytes come from.
+
+Every source hands back the same two-case `ImagePick` — bytes the browser holds, or a
+URL that already exists — and `useApplyImagePick` is the only place that turns one into
+a registered asset. That is where the rules live that a source could otherwise get
+wrong: decode locally first so the canvas paints before any network call; never let two
+layers share one object URL, because deleting either revokes the other's bitmap; keep an
+already-uploaded https URL rather than pulling the bytes down to push them back up
+under a second public id.
+
+**Upload** takes drops, clicks and pastes — paste listens here rather than globally
+because this is the surface that is focused when someone has just copied a screenshot,
+and a global listener would fight the caption editor for the keystroke. **Your images**
+lists what the document already draws, walked from the document rather than from an
+uploads table: an asset row can outlive the layer that referenced it, and offering a
+picture nothing draws any more is how a picker fills with rubbish.
+
+**Library** is the built-in artwork — scribbles, badges, gradient backdrops — declared
+in `config/image-library.ts` and living in `public/library/`. Adding a piece is a file
+plus a line; adding a whole category is a folder plus an entry. The panel reads the
+config, so neither touches a component.
+
+Two things are load-bearing about how a library pick works:
+
+- **It is rasterised, not linked.** Konva draws bitmaps, so an SVG handed to the canvas
+  is decoded once at its intrinsic size and a 400px doodle is visibly soft in a 3×
+  export. `rasterizeLibraryImage` draws it to a PNG at a resolution the *category*
+  chooses (`rasterSize` — a backdrop needs more than a doodle), and hands back a File.
+  From there it is an ordinary upload: local object URL now, Cloudinary on save. Nothing
+  downstream knows the library exists, which is what spares it a persistence story of
+  its own.
+- **Ink is applied before the bitmap exists.** Recolourable artwork is drawn with
+  `currentColor`, substituted in the markup at rasterise time. That is what lets one
+  file serve a dark backdrop and a light one, and it is why the swatch lives in the
+  picker rather than on the layer. Tiles preview it by *inlining* the same SVG so
+  `currentColor` resolves from CSS — a mask, the obvious alternative, flattens the alpha
+  channel and turns every badge into a silhouette.
+
+**Store badges are the owners' own files, fetched not drawn.** The Store Badges category
+splits into sub-tabs by owner — Icons, Apple Badges, Google Badges — because the licence
+differs by owner, and one grid mixing Apple's artwork with Google's would make the notice
+above it a lie about which terms apply. The badges themselves come from Apple's and
+Google's own endpoints via [`scripts/fetch-store-badges.ts`](scripts/fetch-store-badges.ts)
+(`pnpm fetch-store-badges [locale]`), because both licences require the owner's
+*unmodified* artwork — a redrawn lookalike is a violation rather than a shortcut. Keeping
+the fetch in a script rather than hand-committing the binaries is what makes the
+provenance of every file in `public/library/badges/` readable.
+
+Neither brand badge is `recolorable`, which is the mechanism that stops the ink swatch
+from tinting a trademark. A group can still carry an `empty` state — a first-class case,
+not a missing feature — which is what a fresh clone sees before the script is run, and
+why sub-tabs and the notice only appear once a category is opened on its own: they say
+nothing useful next to a row of doodles.
+
+Two rules the real artwork forced out: a bitmap is **never upscaled** by the rasteriser
+(Google's badge is a 646px PNG, and enlarging it to 1024 invents pixels and lands softer
+than the file it started from), and a tile that does not `cover` shows the transparency
+checkerboard — a white App Store badge on a white tile is invisible, and "is this
+transparent or is it broken" is the one question a picker must never leave open.
+
+**Status: ✅**
+
+**Backlog**
+
+- Three sources. A stock-photo search (behind an API key) is the obvious next entry.
+- No multi-select — one pick fills one layer.
+- The picker is only wired to image layers. The background panel and the device
+  screenshot still have their own dropzone, and would each be one `assetKey` away
+  from using it.
+- "Your images" is scoped to the open project; there is no account-wide library
+  (that needs [H2](#h2-asset-records)).
+- Library ink is chosen at pick time and baked into the PNG; changing it afterwards
+  means picking again.
 
 ---
 
@@ -1088,9 +1226,18 @@ the layer selection, and Escape drops the layer while leaving the panel open. An
 would make every screen click a new reference and re-render both halves' subscribers.
 
 Handle sizes divide out the card scale, or they shrink to nothing on a 2796 px-tall
-artboard. Anchors differ by kind: text gets middle handles for width-only resize,
-device and image are corner-only with `keepRatio`. `boundBoxFunc` refuses degenerate
-boxes so a fast drag past the opposite edge cannot flip a node.
+artboard. Anchors and ratio locking differ by kind, and follow from what each layer's
+box *means*: a device is corner-only with `keepRatio`, because its scale is a single
+document property and a squashed phone is never what anyone meant; text gets middle
+handles so a horizontal drag rewraps; an image gets all eight and resizes freely,
+because its box is a frame the artwork is fitted into rather than the artwork itself —
+see [C7](#c7-image-layer). `boundBoxFunc` refuses degenerate boxes so a fast drag past
+the opposite edge cannot flip a node.
+
+Each kind's transform is normalised by its own function in
+[lib/canvas/transform.ts](lib/canvas/transform.ts) rather than by one with a `kind`
+switch: text and image layers are Groups, and a Group reports no size of its own, so
+the current values have to be passed in from the document.
 
 Each of the five Stages mounts its own Transformer, and each reads only *its* screen's
 selection — reading the raw selection would have all five re-attach on every click.
