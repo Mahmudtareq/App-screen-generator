@@ -258,23 +258,85 @@ follow. Escape discarded an edit. `pnpm lint && pnpm type-check && pnpm build` c
 
 ---
 
+### 10. The device layer grows up: modes, a picker, and admin-authored devices ✅
+**2026-08-18 · a9d099b**
+
+"Add device type modes like appscreens, a Change device picker with all devices,
+and make devices dynamic from an admin panel."
+
+1. **Doc v7.** `deviceId` widened from the built-in enum to any string (a document
+   may now name an admin-authored device; `resolveDevice` falls back to the default
+   frame rather than dropping the doc). A device layer gained `frameMode`
+   (`device` / `screenshot` / `full`) and `perspective` (`none` / `left` / `right`),
+   a screenshot gained `fit` (`cover` / `contain`). All defaults reproduce v6
+   behaviour exactly, so the migration only stamps the version.
+2. **One "Device type" dropdown, two stored fields.** What is drawn and how it
+   leans vary independently, so they are stored orthogonally and mapped to the
+   seven-option select in `lib/devices/frame-modes.ts`. The 3D lean is an affine
+   skew on an *inner* Konva group pivoting on the body centre — the outer group's
+   scale belongs to the Transformer, and `normalizeDeviceTransform` assumes it
+   stays uniform. Konva has no perspective projection; true 3D is a WebGL job.
+3. **Full-screen mode** bleeds the screenshot across the artboard, pinned at the
+   origin: not draggable, skipped by the Transformer, still click-selectable so
+   the panel stays reachable.
+4. **The registry** (`lib/devices/registry.ts`) is now the one id→spec lookup:
+   built-ins stay static TypeScript (unchanged rule — geometry is renderer-coupled
+   and needed synchronously on first paint), admin devices are fetched by the
+   editor's server pages and registered before the first Stage renders. The
+   rotation cache moved from id-keyed Map to a spec-keyed WeakMap so an edited
+   custom device cannot serve its old geometry rotated.
+5. **Catalog grew to 14 devices** — iPhone 6.9″/6.3″ (island & no-island), iPad
+   13″, both Apple Watches, Galaxy S26, Pixel 10 Pro, Nothing Phone 3, a 16:9
+   monitor — behind new `watch`/`desktop` categories and a `nothing` brand. All
+   still `fidelity: "draft"`.
+6. **The picker dialog** (`components/editor/devices/`) lists everything the
+   registry knows, filtered by form factor (Apple / Android / Tablets / Watches /
+   Desktop & TV), each card an SVG silhouette derived from the spec plus
+   resolution and a friendly aspect ratio ("19.5:9", not "110:239"). It replaces
+   the flat select in both the device panel and the Setup popover; selection is
+   still document-level.
+7. **Admin devices** are *authoring rows*, not specs: an admin enters datasheet
+   numbers (screenshot size, bezel, radii, notch, finishes) and `buildDeviceSpec`
+   derives body/screen/viewport — the same function powers the form's live
+   preview, the admin list, and the editor, so they cannot disagree. Stored in a
+   global `Device` collection (no `userId` — the one un-scoped collection, guarded
+   by `withAction({ admin: true })` instead).
+8. **Who is an admin** is `ADMIN_EMAILS` in the environment, not a role column:
+   the users collection is shared with the Auth.js adapter and that interplay is
+   delicate enough that not adding a second field to it is a feature. `/admin`
+   pages 404 for non-admins the way foreign project ids do.
+9. **Capture route** resolves built-ins from the catalog and `custom:` ids from
+   the database, and 400s unknown ids — its schema no longer imports the enum.
+
+**Checked (Playwright against dev):** all five new controls render in the device
+panel; the picker filters and switches the whole set; 3D right/left, screenshot
+only and full screen each paint correctly (scale/rotation/shadow correctly hidden
+for full screen); an admin created "Galaxy Tab S10" through the form and it
+appeared in the editor's picker with a Custom badge and rendered on all five
+canvases; a non-admin gets no sidebar entry and a 404 from `/admin/devices`;
+anonymous is redirected to login. `pnpm lint && pnpm type-check && pnpm build`
+clean — the silhouette and admin components live outside `components/canvas/`,
+so the build canary mattered here.
+
+---
+
 ## Open
 
-### 10. Device spec fidelity 🟡
+### 11. Device spec fidelity 🟡
 Every device in `lib/devices/catalog.ts` is `fidelity: "draft"` — estimated bezel
 geometry. Tuning them against real product photos is the main gap before shipping.
 See [PLAN.md](PLAN.md).
 
-### 11. Batch export ◻
+### 12. Batch export ◻
 Export runs one screen at a time on purpose: each screen is its own Stage, and a
 browser holding five 32MP canvases is how this runs out of memory on an iPad.
 Exporting the whole set needs server-side compositing (`sharp` + a zip).
 
-### 12. Asset records ◻
+### 13. Asset records ◻
 There is no account-wide image library — "Your images" is scoped to the open project.
 That needs the `Asset` model wired up (FEATURES.md H2).
 
-### 13. Smaller gaps ◻
+### 14. Smaller gaps ◻
 Named in each feature's **Backlog** in [FEATURES.md](FEATURES.md). The ones most likely
 to be asked for next:
 
