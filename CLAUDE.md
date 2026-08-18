@@ -171,6 +171,12 @@ Every catch must re-throw Next control-flow errors first
 
 ### Current state
 
+[TASK.md](TASK.md) is the running task log — what has been built, in order, with the
+doc-version bump each task needed. **Keep it current**: add an entry when a task
+starts, and move it to Done with the date and the commit when it lands. It is the
+answer to "what changed and why" that neither the git log nor FEATURES.md gives on
+its own.
+
 [PLAN.md](PLAN.md) tracks phases and known risks. Two things to know:
 
 - **Every device spec is `fidelity: "draft"`** — estimated bezel geometry. Tuning
