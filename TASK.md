@@ -136,23 +136,107 @@ tint both survive rasterisation.
 
 ---
 
+### 7. Account menu in the header, and a redesigned auth pair ✅
+**18 Aug 2026** · `e811bc4`
+
+1. **The header now knows who is signed in.** `AppBar` took a `signedIn: boolean`,
+   which is all it could show — a "Sign in" pair or nothing. It now takes
+   `user: SessionUser | null` and renders `UserMenu`: an avatar (Cloudinary/Google
+   image, initials from name or email as the fallback), the display name beside it
+   from `lg` up, and a dropdown carrying name, email, links to Projects and a new
+   mockup, and **Sign out**.
+2. **The dashboard had no header at all.** That was the actual reported bug — signing
+   in landed on the one page in the app that never rendered the bar. It now wraps the
+   same `AppBar` with `active="projects"`.
+3. **`getSessionUser()`** in `lib/session-user.ts` is the single reduction of the
+   session to the three fields the chrome renders, guarded on `session.user.id`
+   rather than on `session` — a session object without an id is the JWT-callback
+   failure `auth.ts` warns about, and treating it as signed in renders an avatar for
+   a user every server action will then reject.
+4. **Sign-out** is `signOut({ callbackUrl: "/" })` from `next-auth/react`, held in a
+   transition so the item shows a spinner. No local router push: the cookie is
+   cleared server-side and the navigation follows it, so a redirect of our own would
+   race it onto a stale page.
+5. **Login and register redesigned** as a split shell — a dark pitch panel (product
+   claims, three feature rows, subtle radial and grid washes drawn from the theme's
+   own tokens, since the palette is monochrome) beside the form, with the panel
+   dropped below `lg` in favour of a centred logo. Fields grew to 44px with
+   placeholders and `aria-invalid`, the password gained a show/hide toggle, the error
+   became a real alert, and Google's mark is inlined on its button.
+6. **Submit logic is untouched** — same `registerAction` → `signIn("credentials")`
+   sequence, same field-error mapping, same `callbackUrl` handling.
+7. **Doc shape:** unchanged. Nothing here touches the editor document.
+
+**Checked:** registered through the form in a real browser — landed on the dashboard
+with the avatar and name in the bar; the dropdown showed name, email and both links;
+Sign out returned to `/` and `/dashboard` then bounced to `/login?callbackUrl=…`. Same
+bar verified on the editor and templates. `pnpm lint && pnpm type-check && pnpm build`
+all clean, with `/login` and `/register` still prerendered static.
+
+---
+
+### 8. Dashboard: shadcn sidebar shell and a real project grid ✅
+**18 Aug 2026** · `e811bc4`
+
+1. **`app/(app)/layout.tsx`** is the signed-in shell — `SidebarProvider` +
+   `AppSidebar` + `SidebarInset`. `sidebar_state` is read from the cookie on the
+   server so the rail renders at its remembered width in the first paint; restoring
+   it in an effect is a visible jump on every navigation.
+2. **`AppSidebar`** collapses to an icon rail: brand, a `New mockup` button, and
+   Projects / Templates / Editor with `isActive` from `usePathname`. The button is
+   hidden while collapsed rather than shrunk — the rail already has an Editor entry,
+   and two doors to the same room read worse at 3rem than one.
+3. **`NavUser`** is the footer identity row. `UserMenu` was split into
+   `UserMenuItems` + `UserAvatar` so the app bar's round avatar and the sidebar's
+   full-width row share one menu instead of two copies drifting apart.
+4. **`DashboardHeader`** derives its breadcrumbs from the pathname, so a page added
+   to the route group gets a correct header without the layout having to thread
+   anything down to it.
+5. **`ProjectCard`** replaced the flat thumbnail tile: the artwork is *contained*
+   over a gradient well rather than cropped — a store screenshot is a tall portrait
+   frame and `cover` cut the copy off the top of every card — with a hover overlay,
+   a real "No preview yet" placeholder, and a relative timestamp, which is the only
+   thing anyone reads that date for on this screen.
+6. **Pagination now exists.** `listProjectsAction` has always been paginated at 24;
+   the page only ever asked for page 1, so a 25th project was invisible rather than
+   merely off-screen. `?page=` is read from `searchParams` and normalised, since a
+   hand-edited URL is a bad URL rather than an error worth a red message.
+7. **Grid is 2 / 3 / 4 / 5 columns** by breakpoint; below `md` the rail becomes a
+   sheet behind the trigger.
+8. `hooks/use-mobile.ts` came from the shadcn CLI seeding its first value inside an
+   effect, which this project's `react-hooks/set-state-in-effect` rule rejects. It
+   is a `useSyncExternalStore` now — same media query, no effect, and a server
+   snapshot that matches the old hook's `undefined`-reads-as-false behaviour.
+9. `TooltipProvider` is mounted in this layout, not the root: the collapsed rail's
+   tooltips are the only tooltips in the app.
+10. **Doc shape:** unchanged.
+
+**Checked:** seeded 27 projects against the dev database and walked the result at
+1440 / 1024 / 390 — grid reflows, the rail collapses to icons and reopens, and on
+mobile it is a sheet. Page 2 returns the remaining 3 with `Next` correctly disabled.
+Signed out from the sidebar footer and landed on `/`, with `/dashboard` then
+bouncing to `/login?callbackUrl=…`. The editor and templates still render the
+unchanged app bar. `pnpm lint && pnpm type-check && pnpm build` all clean.
+
+---
+
 ## Open
 
-### 7. Device spec fidelity 🟡
+### 9. Device spec fidelity 🟡
 Every device in `lib/devices/catalog.ts` is `fidelity: "draft"` — estimated bezel
 geometry. Tuning them against real product photos is the main gap before shipping.
 See [PLAN.md](PLAN.md).
 
-### 8. Batch export ◻
+### 10. Batch export ◻
 Export runs one screen at a time on purpose: each screen is its own Stage, and a
 browser holding five 32MP canvases is how this runs out of memory on an iPad.
 Exporting the whole set needs server-side compositing (`sharp` + a zip).
 
-### 9. Asset records ◻
+### 11. Asset records ◻
 There is no account-wide image library — "Your images" is scoped to the open project.
 That needs the `Asset` model wired up (FEATURES.md H2).
 
-### 10. Smaller gaps ◻
+### 12. Smaller gaps ◻
 Named in each feature's **Backlog** in [FEATURES.md](FEATURES.md). The ones most likely
 to be asked for next:
 
