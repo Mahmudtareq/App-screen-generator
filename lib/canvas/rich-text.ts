@@ -24,7 +24,11 @@
  * styled by hand.
  */
 
-import { resolveBoldWeight, resolveFontFamily } from "@/config/fonts";
+import {
+  quoteFontFamily,
+  resolveBoldWeight,
+  resolveFontFamily,
+} from "@/config/fonts";
 import type { TextLayer } from "@/schemas/editor";
 
 /** One stretch of one run on one line — a single Konva `Text` node. */
@@ -121,7 +125,11 @@ function measureContext(): CanvasRenderingContext2D {
 }
 
 export function layoutRichText(layer: TextLayer): RichTextLayout {
-  const family = resolveFontFamily(layer.fontId);
+  // Quoted exactly as Konva quotes it. Konva builds its own `ctx.font` from the
+  // node's `fontFamily`, and a family measured here as `Open Sans` but painted
+  // there as `"Open Sans"` is two different font strings — which is the whole
+  // class of bug this layout pass exists to prevent.
+  const family = quoteFontFamily(resolveFontFamily(layer.fontId));
   const boldWeight = resolveBoldWeight(layer.fontId, layer.fontWeight);
   const lineHeightPx = layer.lineHeight * layer.fontSize;
   // A zero-width box would divide by nothing and wrap every character forever.

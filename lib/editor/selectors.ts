@@ -5,8 +5,10 @@ import type { Colorway, DeviceSpec } from "@/lib/devices/types";
 import {
   isDeviceLayer,
   isImageLayer,
+  isTextLayer,
   type Screen,
   type ScreenLayer,
+  type TextRole,
 } from "@/schemas/editor";
 
 import type { EditorState } from "./state";
@@ -45,6 +47,50 @@ export function selectLayerById(screenId: string, layerId: string) {
 export function selectLayerIds(screenId: string) {
   return (state: EditorState): string[] =>
     selectScreen(screenId)(state)?.layers.map((layer) => layer.id) ?? [];
+}
+
+/**
+ * The font shared by every text layer of one role, or null if they disagree.
+ *
+ * Null is the honest answer for a set whose titles have been styled apart — the
+ * Globals popover shows "Mixed" rather than picking one screen's font and implying
+ * the others match it. Pinned screens count: they are excluded from the write, so
+ * letting them drag the reading to "Mixed" is what tells the user why their change
+ * did not reach everything.
+ */
+export function selectRoleFontId(role: TextRole) {
+  return (state: EditorState): string | null => {
+    let font: string | null = null;
+
+    for (const screen of state.doc.screens) {
+      for (const layer of screen.layers) {
+        if (!isTextLayer(layer) || layer.role !== role) continue;
+        if (font === null) font = layer.fontId;
+        else if (font !== layer.fontId) return null;
+      }
+    }
+
+    return font;
+  };
+}
+
+/**
+ * Every font the document currently uses, as a stable string key.
+ *
+ * A key rather than an array because Zustand v5 compares with `Object.is`: a fresh
+ * array per render would re-fire the subscriber on every keystroke. The consumer
+ * splits it back apart to load the faces.
+ */
+export function selectUsedFontKey(state: EditorState): string {
+  const ids = new Set<string>();
+
+  for (const screen of state.doc.screens) {
+    for (const layer of screen.layers) {
+      if (isTextLayer(layer)) ids.add(layer.fontId);
+    }
+  }
+
+  return [...ids].sort().join("|");
 }
 
 export function selectColorwayFor(spec: DeviceSpec, colorwayId: string): Colorway {

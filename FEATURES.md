@@ -46,6 +46,8 @@ The build is the canary that Konva has not leaked into the server bundle.
 | [E1](#e1-templates) | Templates | 🟡 | Project |
 | [E2](#e2-device-catalog--orientation) | Device catalog & orientation | 🟡 | Project |
 | [E3](#e3-artboard-size--presets) | Artboard size & presets | ✅ | Project |
+| [E4](#e4-global-fonts) | Global fonts | ✅ | Project |
+| [E5](#e5-colour-replacer) | Colour replacer | ✅ | Project |
 | [F1](#f1-konva-stage-pipeline) | Konva stage pipeline | ✅ | Engine |
 | [F2](#f2-origin-clean-image-cache) | Origin-clean image cache | ✅ | Engine |
 | [F3](#f3-canvas-fonts) | Canvas fonts | ✅ | Engine |
@@ -850,6 +852,91 @@ Dimension inputs are held as text while typing, so an intermediate `12` on the w
 
 ---
 
+### E4. Global fonts
+
+**What it is.** One font for every title and one for every subtitle, set from the
+**Global fonts** tab of the toolbar's **Globals** popover, plus the font browser both
+it and a single layer's inspector open.
+
+**Files**
+
+- [components/editor/panels/globals-panel.tsx](components/editor/panels/globals-panel.tsx) — the popover
+- [components/editor/fonts/font-picker-dialog.tsx](components/editor/fonts/font-picker-dialog.tsx) — the browser
+- [components/editor/fonts/font-picker-field.tsx](components/editor/fonts/font-picker-field.tsx) — the shared trigger
+- `setRoleFont` in [lib/editor/slices/document.ts](lib/editor/slices/document.ts); `selectRoleFontId` in [lib/editor/selectors.ts](lib/editor/selectors.ts)
+- [lib/editor/recent-fonts.ts](lib/editor/recent-fonts.ts) — the picker's Recent list
+
+**How it works.** Project-level for the same reason the artboard is: a set of store
+screenshots whose typeface changes halfway through is not a set. Picking writes the
+font onto every unpinned screen's layers of that role, snapping `fontWeight` to the
+nearest weight the new family actually ships — Poppins stops at 700, so an 800
+headline has to land somewhere the dropdown can still show.
+
+There is no `globalFont` field in the document. The popover *reads* the font back off
+the layers (`selectRoleFontId`), so a set styled apart reads as "Mixed" rather than
+letting one screen speak for the rest, and a single layer's inspector stays a real
+override instead of being clobbered by an inherited value.
+
+The browser is a dialog rather than a dropdown because choosing a typeface is a
+comparison: every family renders in itself, lazily, as its row nears the viewport.
+See [F3](#f3-canvas-fonts) for how the Google faces are fetched.
+
+**Status: ✅**
+
+**Backlog**
+
+- Recent fonts are per browser, not per account.
+- No global shadow: a caption's shadow and pill are still per layer.
+
+---
+
+### E5. Colour replacer
+
+**What it is.** Find-and-replace for colour — the **Colour replacer** tab lists every
+colour the set paints, and swapping one repaints every element using it.
+
+**Files**
+
+- [lib/editor/colors.ts](lib/editor/colors.ts) — the traversal, `normalizeHex`, `replaceDocColor`
+- [components/editor/panels/color-replacer-panel.tsx](components/editor/panels/color-replacer-panel.tsx)
+- `replaceColor` in [lib/editor/slices/document.ts](lib/editor/slices/document.ts); `selectColorKey` in [lib/editor/selectors.ts](lib/editor/selectors.ts)
+
+**How it works.** A find-and-replace rather than a palette the layers point at. The
+document has no colour indirection and adding one would mean migrating every existing
+project into it; walking the fields is the honest version of the same gesture.
+
+Listing and rewriting share **one traversal** (`mapScreenColors`). Two passes over two
+hand-written field lists would drift the moment a colour is added anywhere, and the
+failure mode is a swatch that Replace quietly does nothing to. It covers background
+colour, gradient stops, a caption's colour, its runs' colour and highlight, its shadow
+and its pill. Device colourways are not included: a frame's finish is a catalogue
+entry, not a hex.
+
+The traversal reports *what kind of element* it is looking at as well as the value, so
+each swatch carries a "Background · Title" line and the footer names the exact damage
+("Repaints 6 uses — title · shadow"). That cannot be derived after the fact: once a
+colour is only a hex, the two elements holding it are indistinguishable.
+
+Hexes are compared normalised, because the document genuinely holds several spellings
+of one colour — the schema takes 3, 4, 6 and 8 digits, templates are hand-written, and
+react-colorful emits its own case. Raw-string matching would list `#FFF` and `#ffffff`
+as two colours and replace only one.
+
+Pinned screens are excluded from the *list* as well as from the write, so every swatch
+offered is one that can actually move. Replacing is a button, not live-on-pick: a drag
+through the colour wheel would otherwise repaint the set on every intermediate hue and
+shift the palette under the cursor.
+
+**Status: ✅**
+
+**Backlog**
+
+- One colour at a time; no "replace these three with this scheme".
+- Opacity is a separate field, so replacing a colour does not touch the transparency
+  of what paints it.
+
+---
+
 ## F. Canvas engine
 
 ### F1. Konva stage pipeline
@@ -932,13 +1019,14 @@ ship. This is Risk 1 in [PLAN.md](PLAN.md).
 
 ### F3. Canvas fonts
 
-**What it is.** Self-hosted faces with literal family names, loaded before Konva
-measures anything.
+**What it is.** Four self-hosted faces plus a curated slice of Google Fonts, loaded
+before Konva measures anything.
 
 **Files**
 
-- [config/fonts.ts](config/fonts.ts) — the registry
+- [config/fonts.ts](config/fonts.ts) — the registry, the Google catalogue, and `resolveFont`
 - [lib/canvas/fonts.ts](lib/canvas/fonts.ts) — `ensureFontsLoaded`, `watchFontLoading`
+- [lib/canvas/google-fonts.ts](lib/canvas/google-fonts.ts) — on-demand stylesheet injection
 - `@font-face` rules in [app/globals.css](app/globals.css); files in [public/fonts/](public/fonts/)
 
 **How it works.** Deliberately separate from the app's UI font. `next/font` generates a
@@ -947,18 +1035,40 @@ which is how Konva measures and paints — cannot resolve CSS variables. Passing
 `var(--font-sans)` to a Konva Text node fails *silently* and falls back to
 sans-serif. Hence literal names with a `Canvas` suffix.
 
+Both sources share one id space: a built-in id (`inter`), or `google:<Family>`. A
+family shipped as both resolves to the built-in id, so picking Inter costs no network
+request. `resolveFont` falls back to the default rather than throwing, which is what
+lets `fontId` be a free string — a document naming a family the catalogue has since
+dropped loses a face, not the whole document.
+
+A Google family is only fetched when something asks for it: the picker asks for
+weight 400 to draw a row, selecting it widens the request to the family's full weight
+set, and opening a saved project asks for every family its captions name. Requests are
+tracked per family, so the export pipeline's bare `ensureFontsLoaded()` re-awaits
+exactly what the document uses. A stylesheet that fails is retried without the weight
+list — css2 answers an unavailable weight with a 400 for the whole request — and then
+given up on, so an unreachable font degrades to the fallback face rather than to a
+stalled editor.
+
 Konva bakes text metrics at construction, so a face arriving late bakes wrong line
 breaks — the title wraps to two lines in preview and three in the export. Mitigated by
 gating first render on `ensureFontsLoaded()` (called once from the strip, not per
 card), bumping `fontsVersion` to force a redraw when a face lands late, and re-awaiting
 fonts inside the export pipeline. This is Risk 2 in [PLAN.md](PLAN.md).
 
+Family names reach `ctx.font` quoted exactly the way Konva quotes them
+(`quoteFontFamily`). `Open Sans` measured by hand and `"Open Sans"` painted by Konva
+are two different font strings, and the divergence shows up as a wrap point that moves
+between preview and export.
+
 **Status: ✅**
 
 **Backlog**
 
-- Four families. Adding one is a registry entry, an `@font-face` rule and a woff2.
-- Every weight of every family is fetched up front; no subsetting per document.
+- The Google catalogue is a hand-curated ~75 families, not the live directory; "Browse
+  all Google Fonts" links out for anything else.
+- Every weight of a selected family is fetched; no subsetting per document.
+- No custom font upload.
 
 ---
 

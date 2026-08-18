@@ -1,5 +1,5 @@
 import { getTemplate, MAX_SCREENS } from "@/config/templates";
-import type { CanvasFontId } from "@/config/fonts";
+import { nearestWeight, type CanvasFontId } from "@/config/fonts";
 import { getDevice } from "@/lib/devices/catalog";
 import { orientSpec } from "@/lib/devices/orientation";
 import {
@@ -14,6 +14,7 @@ import {
   type ScreenLayer,
 } from "@/schemas/editor";
 
+import { replaceDocColor } from "../colors";
 import {
   createBlankScreen,
   createDeviceLayer,
@@ -296,6 +297,47 @@ export function createDocumentSlice(
           })),
         };
       }),
+
+    /**
+     * The global font for a role — every title, or every subtitle, across the set.
+     *
+     * Pinned screens are skipped like they are by every other bulk write, and the
+     * weight is snapped rather than carried over: the new family may not ship the
+     * old weight, and a 800 headline that silently paints at 700 is worse than one
+     * whose control admits what it is showing.
+     */
+    setRoleFont: (role, fontId) =>
+      patchDoc(set, (doc) => ({
+        ...doc,
+        screens: doc.screens.map((screen) => {
+          if (screen.pinned) return screen;
+
+          return {
+            ...screen,
+            layers: screen.layers.map((layer) =>
+              isTextLayer(layer) && layer.role === role
+                ? {
+                    ...layer,
+                    fontId,
+                    fontWeight: nearestWeight(fontId, layer.fontWeight),
+                  }
+                : layer,
+            ),
+          };
+        }),
+      })),
+
+    /**
+     * Swaps a colour for another across the whole set.
+     *
+     * A find-and-replace rather than a palette the layers point at: the document
+     * has no colour indirection, and adding one would mean every existing project
+     * migrating into it. Walking the fields is the honest version of the same
+     * gesture — and it stays honest, because the panel's "current colours" list is
+     * built by the same traversal that does the rewriting.
+     */
+    replaceColor: (from, to) =>
+      patchDoc(set, (doc) => replaceDocColor(doc, from, to)),
 
     /* -------------------------------- screens ------------------------------- */
 

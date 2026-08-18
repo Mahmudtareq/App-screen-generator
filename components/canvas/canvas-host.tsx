@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import dynamic from "next/dynamic";
 
 import { ensureFontsLoaded, watchFontLoading } from "@/lib/canvas/fonts";
+import { selectUsedFontKey } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -40,6 +41,7 @@ export function useCanvasFonts() {
   const setFontsReady = useEditorStore((s) => s.setFontsReady);
   const bumpFontsVersion = useEditorStore((s) => s.bumpFontsVersion);
   const fontsReady = useEditorStore((s) => s.fontsReady);
+  const usedFontKey = useEditorStore(selectUsedFontKey);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +57,15 @@ export function useCanvasFonts() {
       unwatch();
     };
   }, [setFontsReady, bumpFontsVersion]);
+
+  // The self-hosted faces above are always available; a Google family only exists
+  // once something asks for it. Opening a saved project is that ask — without this
+  // its captions would measure against the fallback until the user happened to
+  // open the picker, and export re-awaits exactly the families requested here.
+  useEffect(() => {
+    if (!usedFontKey) return;
+    void ensureFontsLoaded(usedFontKey.split("|"));
+  }, [usedFontKey]);
 
   return fontsReady;
 }

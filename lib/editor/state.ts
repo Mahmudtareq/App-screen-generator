@@ -7,6 +7,7 @@ import type {
   LayerKind,
   Screen,
   ScreenLayer,
+  TextRole,
 } from "@/schemas/editor";
 
 import type {
@@ -38,6 +39,20 @@ export interface DocumentSlice {
   setArtboard: (artboard: Artboard) => void;
   setDeviceId: (deviceId: DeviceId) => void;
   setOrientation: (orientation: Orientation) => void;
+  /**
+   * Sets one text role's font on every unpinned screen at once.
+   *
+   * Document level because a set of store screenshots that changes typeface
+   * halfway through is not a set — the toolbar's Globals popover is the only place
+   * that should be able to do it, and a single screen's inspector stays the
+   * override for the one frame that needs to differ.
+   */
+  setRoleFont: (role: TextRole, fontId: string) => void;
+  /**
+   * Repaints one colour as another everywhere it appears on an unpinned screen —
+   * backgrounds, gradient stops, captions, their runs, shadows and pills.
+   */
+  replaceColor: (from: string, to: string) => void;
 
   /* -------------------------------- screens --------------------------------- */
 

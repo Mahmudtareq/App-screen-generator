@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Download,
+  Globe,
   LayoutTemplate,
   Redo2,
   RotateCcw,
@@ -33,6 +34,7 @@ import { getTemplate } from "@/config/templates";
 import { useEditorHistory, useEditorStore } from "@/lib/editor/store";
 import { cn } from "@/lib/utils";
 
+import { GlobalsPanel } from "./panels/globals-panel";
 import { SetupPanel } from "./panels/setup-panel";
 import { SaveButton } from "./save-button";
 import { TemplatePicker } from "./template-picker";
@@ -46,7 +48,8 @@ const PRESET_GROUPS = [...new Set(ARTBOARD_PRESETS.map((p) => p.group))];
  *
  * The size selector lives here, not in a screen's inspector, because it is
  * document-level — five frames of one store listing have to share a canvas size or
- * they stop being a set.
+ * they stop being a set. Globals is the same argument applied to type: the font a
+ * title is set in belongs to the listing, not to the frame.
  */
 export function EditorToolbar({
   projectId,
@@ -162,6 +165,23 @@ export function EditorToolbar({
       </Button>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 aria-expanded:bg-emerald-500/25 dark:text-emerald-400"
+            title="Fonts that apply to every screen"
+          >
+            <Globe className="size-4" />
+            Globals
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto">
+          <GlobalsPanel />
+        </PopoverContent>
+      </Popover>
 
       <Popover>
         <PopoverTrigger asChild>

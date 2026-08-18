@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { ColorPicker } from "@/components/common/color-picker";
 import { NumberInput } from "@/components/common/number-input";
+import { FontPickerField } from "@/components/editor/fonts/font-picker-field";
 import {
   Select,
   SelectContent,
@@ -13,12 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import {
-  CANVAS_FONTS,
-  getCanvasFont,
-  resolveFontFamily,
-  type CanvasFontId,
-} from "@/config/fonts";
+import { nearestWeight, resolveFont, resolveFontFamily } from "@/config/fonts";
 import { useEditorStore } from "@/lib/editor/store";
 import type { TextLayer } from "@/schemas/editor";
 
@@ -38,7 +34,7 @@ export function TextLayerPanel({
   const patch = (next: Partial<TextLayer>) =>
     updateLayer<TextLayer>(screenId, layer.id, next);
 
-  const font = getCanvasFont(layer.fontId);
+  const font = resolveFont(layer.fontId);
 
   return (
     <div className="space-y-3">
@@ -58,25 +54,18 @@ export function TextLayerPanel({
       />
 
       {/* Weight is three digits wide at most, so it gets a fixed column and the
-          family keeps the rest — "Playfair Display" needs the room. */}
-      <div className="grid grid-cols-[1fr_5.5rem] gap-2">
-        <Field label="Font">
-          <Select
-            value={layer.fontId}
-            onValueChange={(v) => patch({ fontId: v as CanvasFontId })}
-          >
-            <SelectTrigger className="h-8 w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CANVAS_FONTS.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  <span style={{ fontFamily: option.family }}>{option.label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+          family keeps the rest — "Cormorant Garamond" needs the room. */}
+      <div className="grid grid-cols-[1fr_5.5rem] items-end gap-2">
+        <FontPickerField
+          label="Font"
+          value={layer.fontId}
+          // Only this caption. The same picker in the toolbar's Globals popover
+          // writes the whole set, which is what makes this the override.
+          onChange={(fontId) =>
+            patch({ fontId, fontWeight: nearestWeight(fontId, layer.fontWeight) })
+          }
+          dialogTitle="Applies to this text layer only"
+        />
 
         <Field label="Weight">
           <Select

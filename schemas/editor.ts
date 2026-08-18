@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { ARTBOARD_MAX, ARTBOARD_MIN } from "@/config/artboards";
-import { CANVAS_FONT_IDS, DEFAULT_FONT_ID } from "@/config/fonts";
+import { DEFAULT_FONT_ID } from "@/config/fonts";
 import { DEFAULT_TEMPLATE_ID, MAX_SCREENS, TEMPLATE_IDS } from "@/config/templates";
 import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
 
@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 3;
+export const EDITOR_DOC_VERSION = 4;
 
 const hexColorSchema = z
   .string()
@@ -232,7 +232,16 @@ export const textLayerSchema = z.object({
    * text is a hard line break.
    */
   runs: z.array(textRunSchema).max(MAX_TEXT_RUNS).default([]),
-  fontId: z.enum(CANVAS_FONT_IDS).default(DEFAULT_FONT_ID),
+  /**
+   * Which font paints the copy — a built-in id, or `google:<Family>`.
+   *
+   * A free string rather than an enum of the self-hosted four: the Google catalogue
+   * in `config/fonts.ts` is a curated list that will change, and a document naming
+   * a family that has since left it must still parse. `resolveFont` falls back to
+   * the default rather than throwing, so an unresolvable id costs a face, not a
+   * whole document.
+   */
+  fontId: z.string().min(1).max(64).default(DEFAULT_FONT_ID),
   /** Artboard px — the same unit as x/y, so inspector controls need no conversion. */
   fontSize: z.number().min(1).max(1024),
   fontWeight: z.number().int().min(100).max(900).default(400),

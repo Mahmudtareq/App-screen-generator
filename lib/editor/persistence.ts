@@ -126,6 +126,17 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
       }),
     };
   },
+
+  /**
+   * v3 → v4: `fontId` widens from the four self-hosted ids to any font id,
+   * including `google:<Family>`.
+   *
+   * Nothing inside a v3 document needs rewriting — every id it can hold is still
+   * valid — so this only stamps the version. That stamp is the point: it is what
+   * tells a client running older code that this document may name a font it cannot
+   * resolve, rather than letting it fail the enum parse and drop the draft whole.
+   */
+  3: (doc) => ({ ...doc, version: 4 }),
 };
 
 /**
