@@ -7,3 +7,4 @@
 export { User, type IUser } from "./User";
 export { Project, type IProject } from "./Project";
 export { Asset, type IAsset } from "./Asset";
+export { Device, type IDevice } from "./Device";

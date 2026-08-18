@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { DEVICE_IDS } from "@/lib/devices/catalog";
 
 /**
  * Hostnames that must never be captured.
@@ -62,7 +61,9 @@ export const captureUrlSchema = z
 
 export const captureRequestSchema = z.object({
   url: captureUrlSchema,
-  deviceId: z.enum(DEVICE_IDS),
+  // Any device id, not the built-in enum: the route resolves admin-authored
+  // devices from the database and rejects unknown ids itself.
+  deviceId: z.string().min(1).max(64),
   orientation: z.enum(["portrait", "landscape"]).default("portrait"),
   fullPage: z.boolean().default(false),
 });

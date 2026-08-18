@@ -14,6 +14,9 @@ export const routes = {
     dashboard: "/dashboard",
     project: (id: string) => `/editor/${id}`,
   },
+  admin: {
+    devices: "/admin/devices",
+  },
   api: {
     cloudinarySign: "/api/cloudinary/sign",
   },

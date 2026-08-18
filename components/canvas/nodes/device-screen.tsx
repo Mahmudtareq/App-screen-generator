@@ -7,24 +7,34 @@ import { Group, Image as KonvaImage } from "react-konva";
 import { useCanvasBitmap } from "@/hooks/use-canvas-image";
 import { coverCrop } from "@/lib/canvas/cover";
 import { traceRoundedRect } from "@/lib/devices/geometry";
-import type { DeviceSpec } from "@/lib/devices/types";
+import type {
+  CornerRadius,
+  DeviceSpec,
+  Rect as DeviceRect,
+} from "@/lib/devices/types";
+import type { ScreenshotFit } from "@/schemas/editor";
 
 /**
- * The screenshot, clipped into the device's screen area.
+ * A screenshot fitted into an arbitrary rounded rect.
  *
- * The Image node's bounds are exactly the screen rect; fitting is done with
- * Konva's `crop` (see lib/canvas/cover.ts) rather than by scaling an oversized
- * child. Rounded corners come from the parent Group's `clipFunc`, which is exact
- * at any pixel ratio — unlike masking with a second bitmap.
+ * Extracted from the device screen so every frame mode draws its bitmap the same
+ * way — framed screen, bare screenshot and full-bleed all differ only in the
+ * rect they hand this. `cover` crops via Konva's `crop` (see lib/canvas/cover.ts)
+ * and is the only mode zoom/pan apply to; `contain` letterboxes, centred, and
+ * whatever sits behind shows through the bars.
  */
-export function DeviceScreen({
-  spec,
+export function ScreenshotImage({
+  rect,
+  cornerRadius,
   url,
+  fit,
   zoom,
   pan,
 }: {
-  spec: DeviceSpec;
+  rect: DeviceRect;
+  cornerRadius: CornerRadius;
   url: string | null;
+  fit: ScreenshotFit;
   zoom: number;
   pan: { x: number; y: number };
 }) {
@@ -33,16 +43,39 @@ export function DeviceScreen({
   // Konva wraps this in beginPath()/clip() itself, so it only traces.
   const clipFunc = useCallback(
     (ctx: KonvaContext) => {
-      traceRoundedRect(ctx, spec.screen, spec.screen.cornerRadius);
+      traceRoundedRect(ctx, rect, cornerRadius);
     },
-    [spec.screen],
+    [rect, cornerRadius],
   );
 
   if (!bitmap) return null;
 
+  if (fit === "contain") {
+    const scale = Math.min(
+      rect.width / bitmap.naturalWidth,
+      rect.height / bitmap.naturalHeight,
+    );
+    const width = bitmap.naturalWidth * scale;
+    const height = bitmap.naturalHeight * scale;
+
+    return (
+      <Group clipFunc={clipFunc} listening={false}>
+        <KonvaImage
+          image={bitmap}
+          x={rect.x + (rect.width - width) / 2}
+          y={rect.y + (rect.height - height) / 2}
+          width={width}
+          height={height}
+          listening={false}
+          perfectDrawEnabled={false}
+        />
+      </Group>
+    );
+  }
+
   const crop = coverCrop(
     { width: bitmap.naturalWidth, height: bitmap.naturalHeight },
-    { width: spec.screen.width, height: spec.screen.height },
+    { width: rect.width, height: rect.height },
     zoom,
     pan,
   );
@@ -51,14 +84,40 @@ export function DeviceScreen({
     <Group clipFunc={clipFunc} listening={false}>
       <KonvaImage
         image={bitmap}
-        x={spec.screen.x}
-        y={spec.screen.y}
-        width={spec.screen.width}
-        height={spec.screen.height}
+        x={rect.x}
+        y={rect.y}
+        width={rect.width}
+        height={rect.height}
         crop={crop}
         listening={false}
         perfectDrawEnabled={false}
       />
     </Group>
+  );
+}
+
+/** The screenshot, clipped into the device's screen area. */
+export function DeviceScreen({
+  spec,
+  url,
+  fit,
+  zoom,
+  pan,
+}: {
+  spec: DeviceSpec;
+  url: string | null;
+  fit: ScreenshotFit;
+  zoom: number;
+  pan: { x: number; y: number };
+}) {
+  return (
+    <ScreenshotImage
+      rect={spec.screen}
+      cornerRadius={spec.screen.cornerRadius}
+      url={url}
+      fit={fit}
+      zoom={zoom}
+      pan={pan}
+    />
   );
 }

@@ -51,7 +51,7 @@ export function UrlCapture({
 
       // A previous upload's URL would otherwise keep rendering after a reload.
       updateLayer(screenId, layerId, {
-        screenshot: { assetId: null, url: null, zoom: 1, pan: { x: 0, y: 0 } },
+        screenshot: { assetId: null, url: null, fit: "cover", zoom: 1, pan: { x: 0, y: 0 } },
       });
 
       toast.success("Captured", { id: toastId });

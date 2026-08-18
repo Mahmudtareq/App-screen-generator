@@ -8,8 +8,8 @@ import {
   type Template,
   type TemplateScreenCopy,
 } from "@/config/templates";
-import { getDevice, type DeviceId } from "@/lib/devices/catalog";
 import { orientSpec } from "@/lib/devices/orientation";
+import { resolveDevice } from "@/lib/devices/registry";
 import type { DeviceSpec, Orientation } from "@/lib/devices/types";
 import {
   EDITOR_DOC_VERSION,
@@ -82,9 +82,11 @@ export function createDeviceLayer(
     locked: false,
     opacity: 1,
     colorwayId,
+    frameMode: "device",
+    perspective: "none",
     ...fitDeviceToArtboard(spec, artboard),
     shadowEnabled: true,
-    screenshot: { assetId: null, url: null, zoom: 1, pan: { x: 0, y: 0 } },
+    screenshot: { assetId: null, url: null, fit: "cover", zoom: 1, pan: { x: 0, y: 0 } },
   };
 }
 
@@ -234,12 +236,12 @@ export function createDocFromTemplate(
   const orientation = options.orientation ?? "portrait";
 
   const artboard = templateArtboard(template);
-  const spec = orientSpec(getDevice(template.deviceId as DeviceId), orientation);
+  const spec = orientSpec(resolveDevice(template.deviceId), orientation);
 
   return {
     version: EDITOR_DOC_VERSION,
     templateId: template.id as EditorDoc["templateId"],
-    deviceId: template.deviceId as DeviceId,
+    deviceId: template.deviceId,
     orientation,
     artboard,
     screens: template.screens.map((copy) =>
@@ -257,7 +259,7 @@ export function createBlankScreen(
   source?: Screen,
 ): Screen {
   const template = getTemplate(doc.templateId);
-  const spec = orientSpec(getDevice(doc.deviceId), doc.orientation);
+  const spec = orientSpec(resolveDevice(doc.deviceId), doc.orientation);
   const fontId = template.type.fontId as CanvasFontId;
 
   return {

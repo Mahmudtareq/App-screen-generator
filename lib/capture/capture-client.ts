@@ -1,4 +1,3 @@
-import type { DeviceId } from "@/lib/devices/catalog";
 import type { Orientation } from "@/lib/devices/types";
 
 /**
@@ -10,7 +9,7 @@ import type { Orientation } from "@/lib/devices/types";
  */
 export async function captureWebsite(options: {
   url: string;
-  deviceId: DeviceId;
+  deviceId: string;
   orientation: Orientation;
   fullPage?: boolean;
 }): Promise<File> {

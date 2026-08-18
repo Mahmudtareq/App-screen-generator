@@ -44,5 +44,13 @@ export const config = {
    * entirely client-side. Signing in is required to *save*, not to try, which is
    * what makes the editor the product's own advertisement.
    */
-  matcher: ["/dashboard/:path*", "/editor/:id+", "/login", "/register"],
+  matcher: [
+    "/dashboard/:path*",
+    // Admin pages additionally 404 for non-admin users server-side; the proxy
+    // only guarantees there is a session to check.
+    "/admin/:path*",
+    "/editor/:id+",
+    "/login",
+    "/register",
+  ],
 };

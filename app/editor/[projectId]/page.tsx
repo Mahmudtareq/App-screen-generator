@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getProjectAction } from "@/actions/projects/projectActions";
 import { EditorShell } from "@/components/editor/editor-shell";
+import { listEnabledDeviceSpecs } from "@/lib/devices/custom";
 import { getSessionUser } from "@/lib/session-user";
 
 export default async function ProjectEditorPage({
@@ -9,9 +10,10 @@ export default async function ProjectEditorPage({
 }: PageProps<"/editor/[projectId]">) {
   const { projectId } = await params;
 
-  const [result, user] = await Promise.all([
+  const [result, user, customDevices] = await Promise.all([
     getProjectAction({ id: projectId }),
     getSessionUser(),
+    listEnabledDeviceSpecs(),
   ]);
 
   // The action already scopes its query by the session's userId, so a project
@@ -24,6 +26,7 @@ export default async function ProjectEditorPage({
       projectName={result.data.name}
       initialDoc={result.data.doc}
       user={user}
+      customDevices={customDevices}
     />
   );
 }

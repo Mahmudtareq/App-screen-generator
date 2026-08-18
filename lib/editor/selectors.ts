@@ -1,6 +1,7 @@
 import { computeCardScale } from "@/lib/canvas/fit";
-import { getColorway, getDevice } from "@/lib/devices/catalog";
+import { getColorway } from "@/lib/devices/catalog";
 import { orientSpec } from "@/lib/devices/orientation";
+import { resolveDevice } from "@/lib/devices/registry";
 import type { Colorway, DeviceSpec } from "@/lib/devices/types";
 import {
   isDeviceLayer,
@@ -24,7 +25,7 @@ export function selectCardScale(state: EditorState): number {
 
 /** The device spec as it should be rendered, already rotated for the orientation. */
 export function selectOrientedSpec(state: EditorState): DeviceSpec {
-  return orientSpec(getDevice(state.doc.deviceId), state.doc.orientation);
+  return orientSpec(resolveDevice(state.doc.deviceId), state.doc.orientation);
 }
 
 export function selectScreen(screenId: string) {

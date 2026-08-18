@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers, LayoutGrid, LayoutTemplate, PenLine, Plus } from "lucide-react";
+import {
+  Layers,
+  LayoutGrid,
+  LayoutTemplate,
+  MonitorSmartphone,
+  PenLine,
+  Plus,
+} from "lucide-react";
 
 import type { SessionUser } from "@/components/auth/user-menu";
 import { Button } from "@/components/ui/button";
@@ -36,7 +43,14 @@ const NAV = [
  * the app bar instead, because a collapsible rail beside five artboards costs the
  * width the artboards need.
  */
-export function AppSidebar({ user }: { user: SessionUser | null }) {
+export function AppSidebar({
+  user,
+  admin = false,
+}: {
+  user: SessionUser | null;
+  /** Decided server-side against ADMIN_EMAILS; this only controls visibility. */
+  admin?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -98,6 +112,28 @@ export function AppSidebar({ user }: { user: SessionUser | null }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {admin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip="Devices"
+                    isActive={pathname.startsWith(routes.admin.devices)}
+                  >
+                    <Link href={routes.admin.devices}>
+                      <MonitorSmartphone />
+                      <span>Devices</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {user && (

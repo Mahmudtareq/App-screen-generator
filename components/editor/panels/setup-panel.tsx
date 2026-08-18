@@ -1,27 +1,21 @@
 "use client";
 
-import { RotateCw } from "lucide-react";
+import { RefreshCw, RotateCw } from "lucide-react";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ARTBOARD_MAX,
   ARTBOARD_MIN,
   getArtboardPreset,
 } from "@/config/artboards";
-import { DEVICES, type DeviceId } from "@/lib/devices/catalog";
 import { selectOrientedSpec } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { clamp } from "@/lib/utils";
 
+import { DevicePickerDialog } from "../devices/device-picker-dialog";
 import { Field } from "./panel-section";
 
 /**
@@ -33,14 +27,14 @@ import { Field } from "./panel-section";
  * leave the new one either overflowing or adrift.
  */
 export function SetupPanel() {
-  const deviceId = useEditorStore((s) => s.doc.deviceId);
   const orientation = useEditorStore((s) => s.doc.orientation);
   const artboard = useEditorStore((s) => s.doc.artboard);
   const spec = useEditorStore(selectOrientedSpec);
 
-  const setDeviceId = useEditorStore((s) => s.setDeviceId);
   const setOrientation = useEditorStore((s) => s.setOrientation);
   const setArtboard = useEditorStore((s) => s.setArtboard);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Dimensions are held as text while typing so an intermediate "12" on the way
   // to "1290" is not clamped up to the minimum under the user's cursor.
@@ -77,22 +71,17 @@ export function SetupPanel() {
   return (
     <div className="space-y-3">
       <Field label="Device">
-        <Select
-          value={deviceId}
-          onValueChange={(v) => setDeviceId(v as DeviceId)}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-full justify-between font-normal"
+          onClick={() => setPickerOpen(true)}
         >
-          <SelectTrigger className="h-8 w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {DEVICES.map((device) => (
-              <SelectItem key={device.id} value={device.id}>
-                {device.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <span className="truncate">{spec.name}</span>
+          <RefreshCw className="size-3.5 opacity-60" />
+        </Button>
       </Field>
+      <DevicePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} />
 
       <Field label="Orientation">
         <ToggleGroup

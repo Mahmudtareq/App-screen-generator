@@ -18,6 +18,7 @@ import { routes } from "@/config/routes";
 /** Path segment → the label a person would recognise it by. */
 const LABELS: Record<string, string> = {
   dashboard: "Projects",
+  admin: "Admin",
 };
 
 function titleise(segment: string) {

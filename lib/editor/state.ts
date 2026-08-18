@@ -1,4 +1,3 @@
-import type { DeviceId } from "@/lib/devices/catalog";
 import type { Orientation } from "@/lib/devices/types";
 import type {
   Artboard,
@@ -37,7 +36,7 @@ export interface DocumentSlice {
 
   /** Retargets the canvas, rescaling every unpinned screen's layout to match. */
   setArtboard: (artboard: Artboard) => void;
-  setDeviceId: (deviceId: DeviceId) => void;
+  setDeviceId: (deviceId: string) => void;
   setOrientation: (orientation: Orientation) => void;
   /**
    * Sets one text role's font on every unpinned screen at once.

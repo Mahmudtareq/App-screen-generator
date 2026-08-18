@@ -6,7 +6,7 @@ import { Transformer } from "react-konva";
 
 import { selectLayerById, selectScreen } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
-import type { LayerKind } from "@/schemas/editor";
+import { isDeviceLayer, type LayerKind } from "@/schemas/editor";
 
 /** On-screen size of the handles, in CSS px, regardless of how far the artboard is zoomed out. */
 const ANCHOR_SCREEN_SIZE = 10;
@@ -49,9 +49,14 @@ export function SelectionTransformer({
   const selectedLayerId = useEditorStore((s) =>
     s.screenId === screenId ? s.layerId : null,
   );
-  const kind = useEditorStore((s) =>
-    selectedLayerId ? selectLayerById(screenId, selectedLayerId)(s)?.kind : undefined,
+  const selectedLayer = useEditorStore((s) =>
+    selectedLayerId ? selectLayerById(screenId, selectedLayerId)(s) : undefined,
   );
+  const kind = selectedLayer?.kind;
+  // A full-bleed device has no meaningful transform — it is pinned to the
+  // artboard — so attaching handles to it would only offer edits that go nowhere.
+  const fullBleed =
+    selectedLayer && isDeviceLayer(selectedLayer) && selectedLayer.frameMode === "full";
   // Re-attaching when this screen changes covers nodes remounted by an edit —
   // restacking a layer, or swapping the device.
   const screen = useEditorStore(selectScreen(screenId));
@@ -63,11 +68,12 @@ export function SelectionTransformer({
     if (!transformer) return;
 
     const stage = transformer.getStage();
-    const node = selectedLayerId ? stage?.findOne(`#${selectedLayerId}`) : null;
+    const node =
+      selectedLayerId && !fullBleed ? stage?.findOne(`#${selectedLayerId}`) : null;
 
     transformer.nodes(node ? [node] : []);
     transformer.getLayer()?.batchDraw();
-  }, [selectedLayerId, screen]);
+  }, [selectedLayerId, fullBleed, screen]);
 
   // The Stage is scaled to fit, so handle sizes have to be divided back out or
   // they shrink to nothing on a 2796px-tall artboard.

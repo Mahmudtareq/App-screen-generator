@@ -2,6 +2,8 @@
 
 import type { SessionUser } from "@/components/auth/user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { registerCustomDevices } from "@/lib/devices/registry";
+import type { DeviceSpec } from "@/lib/devices/types";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useProjectBootstrap } from "@/hooks/use-project-bootstrap";
 
@@ -22,6 +24,8 @@ export interface EditorShellProps {
   initialDoc?: unknown;
   /** The signed-in user, or null when anonymous. Saving needs one; editing does not. */
   user: SessionUser | null;
+  /** Admin-authored device specs, fetched by the server page. */
+  customDevices?: DeviceSpec[];
 }
 
 /**
@@ -37,7 +41,14 @@ export function EditorShell({
   projectName,
   initialDoc,
   user,
+  customDevices,
 }: EditorShellProps) {
+  // Registered during render, before any Stage mounts, so `resolveDevice` never
+  // has a frame where a document's device id is unknown. The registry is an
+  // idempotent module-level map (like the bitmap cache), so re-running under
+  // Strict Mode is harmless.
+  registerCustomDevices(customDevices ?? []);
+
   const ready = useProjectBootstrap(initialDoc, projectName);
   useEditorShortcuts();
 

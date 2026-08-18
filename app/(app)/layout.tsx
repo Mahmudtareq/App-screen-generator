@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { isAdminEmail } from "@/lib/admin";
 import { getSessionUser } from "@/lib/session-user";
 
 /**
@@ -24,7 +25,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar user={user} />
+        <AppSidebar user={user} admin={isAdminEmail(user?.email)} />
 
         <SidebarInset className="min-w-0">
           <DashboardHeader />

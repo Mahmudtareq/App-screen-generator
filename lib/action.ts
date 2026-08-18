@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { auth } from "@/auth";
 import { env } from "@/config/env";
+import { isAdminEmail } from "@/lib/admin";
 import { connectDB } from "@/lib/db";
 
 /**
@@ -93,6 +94,11 @@ interface ActionConfig<S extends z.ZodTypeAny | undefined> {
   schema?: S;
   /** Defaults to true. */
   auth?: boolean;
+  /**
+   * Requires the signed-in user to be an administrator (see lib/admin.ts).
+   * Implies `auth`; anyone else gets FORBIDDEN before the handler runs.
+   */
+  admin?: boolean;
   /** Defaults to true. */
   db?: boolean;
 }
@@ -124,11 +130,15 @@ export function withAction<TOut, S extends z.ZodTypeAny | undefined = undefined>
 ): (input: Input<S>) => Promise<ActionResult<TOut>> {
   return async function action(rawInput) {
     try {
-      const requireAuth = config.auth ?? true;
+      const requireAuth = (config.auth ?? true) || Boolean(config.admin);
       const session = requireAuth ? await auth() : null;
 
       if (requireAuth && !session?.user?.id) {
         return fail("UNAUTHORIZED", "You need to be signed in to do that.");
+      }
+
+      if (config.admin && !isAdminEmail(session?.user?.email)) {
+        return fail("FORBIDDEN", "Only an administrator can do that.");
       }
 
       let input: unknown = rawInput;

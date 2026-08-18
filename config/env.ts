@@ -35,6 +35,10 @@ const serverEnvSchema = z.object({
   // Optional. Without it, website capture uses Microlink's free endpoint, which
   // is rate limited per IP at roughly 50 requests a day.
   MICROLINK_API_KEY: z.string().min(1).optional(),
+
+  // Comma-separated emails allowed into the admin panel (device management).
+  // Optional: without it, no one is an admin and the panel 404s for everyone.
+  ADMIN_EMAILS: z.string().optional(),
 });
 
 function parseEnv() {

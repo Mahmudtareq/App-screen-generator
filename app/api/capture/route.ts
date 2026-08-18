@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { CaptureError, captureProvider } from "@/lib/capture";
-import { getDevice } from "@/lib/devices/catalog";
+import { getDeviceSpecServer } from "@/lib/devices/custom";
 import { orientSpec } from "@/lib/devices/orientation";
 import { captureRequestSchema } from "@/schemas/capture";
 
@@ -86,8 +86,16 @@ export async function POST(request: Request) {
 
   // Capture at the device's own CSS viewport so the page lays itself out as a
   // phone. Using the device-pixel screenshot size here would render a desktop
-  // layout and then shrink it.
-  const spec = orientSpec(getDevice(deviceId), orientation);
+  // layout and then shrink it. Built-in ids resolve from the static catalog;
+  // admin-authored ones come from the database.
+  const resolved = await getDeviceSpecServer(deviceId);
+  if (!resolved) {
+    return NextResponse.json(
+      { error: "That device is not available." },
+      { status: 400 },
+    );
+  }
+  const spec = orientSpec(resolved, orientation);
 
   try {
     const result = await captureProvider.capture({

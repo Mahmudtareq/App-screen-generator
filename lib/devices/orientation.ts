@@ -122,16 +122,19 @@ function rotateSpec(spec: DeviceSpec): DeviceSpec {
  *
  * Device specs are immutable static data, so caching them is trivially safe.
  */
-const rotatedCache = new Map<string, DeviceSpec>();
+// Keyed by the spec object, not its id: an admin-edited custom device arrives as
+// a fresh object under the same id, and an id-keyed cache would keep serving the
+// rotation of the geometry it used to have.
+const rotatedCache = new WeakMap<DeviceSpec, DeviceSpec>();
 
 /** Returns the spec as it should be rendered for the given orientation. */
 export function orientSpec(spec: DeviceSpec, orientation: Orientation): DeviceSpec {
   if (orientation === "portrait" || !spec.supportsLandscape) return spec;
 
-  const cached = rotatedCache.get(spec.id);
+  const cached = rotatedCache.get(spec);
   if (cached) return cached;
 
   const rotated = rotateSpec(spec);
-  rotatedCache.set(spec.id, rotated);
+  rotatedCache.set(spec, rotated);
   return rotated;
 }

@@ -183,6 +183,15 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * picture.
    */
   5: (doc) => ({ ...doc, version: 6 }),
+
+  /**
+   * v6 → v7: `deviceId` widens from the built-in enum to any device id (admin
+   * devices), a device layer gains `frameMode` and `perspective`, and a
+   * screenshot gains `fit`. Every new field has a schema default that reproduces
+   * the old behaviour exactly — framed, upright, cover-cropped — so this only
+   * stamps the version.
+   */
+  6: (doc) => ({ ...doc, version: 7 }),
 };
 
 /**
