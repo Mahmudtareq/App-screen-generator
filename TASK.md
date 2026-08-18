@@ -220,23 +220,61 @@ unchanged app bar. `pnpm lint && pnpm type-check && pnpm build` all clean.
 
 ---
 
+### 9. Naming a project ✅
+**18 Aug 2026** · `772c615`
+
+There was no way to do either. `createProjectAction` was always called with
+`projectName ?? "Untitled mockup"` and `projectName` is only ever set for an
+*existing* project, so every new project was literally named "Untitled mockup";
+`updateProjectSchema` has always accepted a `name`, but nothing in the UI ever
+sent one.
+
+1. **One control for both cases** — `ProjectTitle`, edited in place in the app bar.
+   Before a project exists, typing there is simply what the eventual
+   `createProjectAction` will be given; afterwards, committing writes the row
+   immediately. A "name this" dialog in front of Save would ask the question at the
+   worst moment and still leave renaming unsolved.
+2. **The name lives in the ui slice**, not in `doc`. It is a `Project` column, so
+   putting it in the document would need a version bump, would serialise it into
+   `doc`, and would make typing a title something Cmd+Z walks back through.
+3. **Drafts keep it too**, under `editor:draft-name:v1` — a sibling key rather than
+   a field inside the draft, because the draft is read back through
+   `editorDocSchema` and a name folded into it would no longer parse. A title typed
+   before signing up survives registration exactly as the screens do.
+4. Seeded from `useProjectBootstrap` alongside the document, through the store
+   rather than React state: reading localStorage during render would not match the
+   server, and seeding from an effect is what `set-state-in-effect` exists to stop.
+5. **`AppBar`'s `projectName: string` became `title: React.ReactNode`.** The bar has
+   no business knowing how renaming works, and `EditorToolbar`/`SaveButton` no
+   longer take the name as a prop at all — the store is the one source.
+6. A failed rename **puts the old name back** rather than leaving the bar showing a
+   title the database does not have. Enter and blur commit, Escape cancels.
+7. **Doc shape:** unchanged. EDITOR_DOC_VERSION stays at 6.
+
+**Checked:** typed a name in the anonymous editor, reloaded, and it came back;
+carried it through registration and hit Save — the created row, the dashboard card
+and the tab title all carried it. Renamed a saved project and saw the dashboard
+follow. Escape discarded an edit. `pnpm lint && pnpm type-check && pnpm build` clean.
+
+---
+
 ## Open
 
-### 9. Device spec fidelity 🟡
+### 10. Device spec fidelity 🟡
 Every device in `lib/devices/catalog.ts` is `fidelity: "draft"` — estimated bezel
 geometry. Tuning them against real product photos is the main gap before shipping.
 See [PLAN.md](PLAN.md).
 
-### 10. Batch export ◻
+### 11. Batch export ◻
 Export runs one screen at a time on purpose: each screen is its own Stage, and a
 browser holding five 32MP canvases is how this runs out of memory on an iPad.
 Exporting the whole set needs server-side compositing (`sharp` + a zip).
 
-### 11. Asset records ◻
+### 12. Asset records ◻
 There is no account-wide image library — "Your images" is scoped to the open project.
 That needs the `Asset` model wired up (FEATURES.md H2).
 
-### 12. Smaller gaps ◻
+### 13. Smaller gaps ◻
 Named in each feature's **Backlog** in [FEATURES.md](FEATURES.md). The ones most likely
 to be asked for next:
 
