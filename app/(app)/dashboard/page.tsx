@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, LayoutTemplate, Plus, Sparkles } from "lucide-react";
 
-import { listProjectsAction } from "@/actions/projects/projectActions";
+import { getProjectList } from "@/actions/projects/projectActions";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
@@ -24,15 +24,15 @@ export default async function DashboardPage({
   // A hand-edited `?page=` is a bad URL, not an error worth a red message — the
   // action would reject anything non-numeric, so it is normalised to 1 here.
   const requested = Number(Array.isArray(page) ? page[0] : page);
-  const result = await listProjectsAction({
-    page: Number.isFinite(requested) && requested >= 1 ? requested : 1,
-    limit: PAGE_SIZE,
-  });
+  const result = await getProjectList(
+    Number.isFinite(requested) && requested >= 1 ? requested : 1,
+    PAGE_SIZE,
+  );
 
-  if (!result.success) {
+  if (!result?.status) {
     return (
       <main className="p-4 sm:p-6">
-        <p className="text-destructive text-sm">{result.error.message}</p>
+        <p className="text-destructive text-sm">{result?.message}</p>
       </main>
     );
   }

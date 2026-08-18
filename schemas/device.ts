@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import type { DeviceSpec } from "@/lib/devices/types";
 
-import { objectIdSchema } from "./project";
-
 /**
  * Admin-authored devices.
  *
@@ -80,8 +78,6 @@ export const deviceInputSchema = z.object({
 });
 
 export const createDeviceSchema = deviceInputSchema;
-export const updateDeviceSchema = deviceInputSchema.extend({ id: objectIdSchema });
-export const deviceIdSchema = z.object({ id: objectIdSchema });
 
 export type DeviceInput = z.infer<typeof deviceInputSchema>;
 export type DeviceNotchInput = z.infer<typeof deviceNotchInputSchema>;

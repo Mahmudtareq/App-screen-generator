@@ -6,12 +6,11 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 
-import { registerAction } from "@/actions/auth/authActions";
+import { handleRegister } from "@/actions/auth/authActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/config/routes";
-import { fieldError } from "@/lib/action-client";
 import { cn } from "@/lib/utils";
 
 export function AuthForm({
@@ -43,18 +42,21 @@ export function AuthForm({
 
     startTransition(async () => {
       if (isRegister) {
-        const result = await registerAction({
+        const result = await handleRegister({
           name: String(form.get("name") ?? ""),
           email,
           password,
         });
 
-        if (!result.success) {
-          setFormError(result.error.message);
+        if (!result?.status) {
+          setFormError(result?.message ?? "Could not create the account.");
+          // On validation failure the API's envelope carries a
+          // { field: message } map in `data`.
+          const details = (result?.data ?? {}) as Record<string, string | undefined>;
           setFieldErrors({
-            name: fieldError(result, "name"),
-            email: fieldError(result, "email"),
-            password: fieldError(result, "password"),
+            name: details.name,
+            email: details.email,
+            password: details.password,
           });
           return;
         }

@@ -320,6 +320,55 @@ so the build canary mattered here.
 
 ---
 
+### 15. Backend refactor: REST API layer in the xoom-api-pannel architecture ✅
+**18 Aug 2026**
+
+Asked for: rework the backend/API implementation to follow the sibling
+`xoom-api-pannel` project's architecture — API routes + shared api-client +
+thin server actions + one response envelope — without touching the UI.
+
+1. **Flow is now UI → server action → `apiClient` → API route → Mongoose.**
+   Actions no longer touch the database; the routes own auth, validation,
+   ownership filters and error mapping. `withAction`/`ActionResult`
+   (`lib/action.ts`, `lib/action-client.ts`) are gone.
+2. **New route layer** under `app/api/`: `projects` (list w/ pagination+search,
+   create), `projects/[id]` (get/patch/delete), `projects/[id]/duplicate`,
+   `auth/register`, `assets` + `assets/[id]`, `admin/devices` +
+   `admin/devices/[id]`. The pre-existing `cloudinary/sign` and `capture`
+   routes were folded onto the same wrapper (capture keeps its raw-bytes
+   success path and anonymous rate limit).
+3. **`lib/async-handler.ts`** wraps every handler — `asyncHandler(handler, auth)`
+   or `asyncHandler(schema, handler, auth)` with auth levels
+   `false | true | "admin"` — owning `connectDB()`, the session guard
+   (attaching `req.user`), awaiting dynamic params, zod body parsing, and
+   error → envelope mapping. **`lib/server.utils.ts`** provides the one
+   `apiResponse` envelope `{ status, message, data }` (validation failures
+   carry a `{ field: message }` map in `data`) plus `escapeRegex`/`makePaginate`.
+4. **`lib/api-client.ts`** is the one server-side fetch wrapper: forwards the
+   Auth.js session cookie (this project's equivalent of the sibling's Bearer
+   token), signs out + redirects to login on 401, base URL from
+   `NEXT_PUBLIC_BASE_URL` in `config/env.ts`.
+5. **Actions renamed to the sibling's style** (`getProjectList`, `getProject`,
+   `createProject`, `updateProject`, `duplicateProject`, `deleteProject`,
+   `handleRegister`, `getDeviceList`, `createDevice`, `updateDevice`,
+   `deleteDevice`, `registerAsset`, `deleteAsset`) as thin apiClient wrappers.
+   Call sites updated to check `result?.status` / `result?.message`; no visual
+   or behavioural UI change. List responses use the one
+   `PaginatedResult` contract (`docs`/`totalDocs`/`pages`/`hasNext`/`hasPrev`)
+   the dashboard already expected; project list gained server-side `search`.
+6. **Invariants preserved:** `updateProject(id, { doc })` stays field-mapping
+   free; ownership stays a filter clause with 404 for foreign ids;
+   `EDITOR_DOC_VERSION` untouched (no doc shape change).
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean. Live smoke test
+against the in-memory Mongo: register (validation map, success, 409 duplicate),
+401/403 guards, credentials sign-in, full projects CRUD over HTTP (create with a
+real v7 doc, list+search, get, rename, empty-PATCH 400, duplicate, foreign-id
+404, delete), dashboard page rendering through the full
+action → apiClient → route chain, and the enveloped Cloudinary signature.
+
+---
+
 ## Open
 
 ### 11. Device spec fidelity 🟡

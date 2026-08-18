@@ -6,14 +6,14 @@ import type { DeviceInput } from "@/schemas/device";
  * An admin-authored device frame.
  *
  * Global rows, not per-user: a device an admin adds is offered to everyone, so
- * there is deliberately no `userId` here and the actions that write it are
+ * there is deliberately no `userId` here and the API routes that write it are
  * admin-gated instead of ownership-filtered.
  *
  * What is stored is the *authoring* shape from `schemas/device.ts` — the
  * renderer's `DeviceSpec` is derived from it on read by `buildDeviceSpec`, so
  * the geometry arithmetic lives in exactly one place. As with `Project.doc`,
  * the zod schema is the authority on shape; this schema mirrors it loosely and
- * `withAction` has already validated by the time anything reaches Mongo.
+ * `asyncHandler` has already validated by the time anything reaches Mongo.
  */
 export interface IDevice extends DeviceInput {
   _id: Types.ObjectId;

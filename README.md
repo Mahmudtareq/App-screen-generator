@@ -69,8 +69,10 @@ Four decisions everything else follows from:
 | Path | What lives there |
 |---|---|
 | `app/` | Routes. `editor/` and `templates/` are public; `dashboard/` and `editor/[projectId]/` are not |
-| `actions/<domain>/` | Server actions, `"use server"` on line 1 |
-| `lib/action.ts` | The one `ActionResult` envelope and the `withAction` wrapper |
+| `actions/<domain>/` | Server actions, `"use server"` on line 1 — thin wrappers over the api-client |
+| `app/api/` | The REST API routes, each wrapped in `asyncHandler` |
+| `lib/api-client.ts` | The one server-side fetch wrapper actions call the API through |
+| `lib/async-handler.ts`, `lib/server.utils.ts` | Route wrapper (auth, zod, error mapping) and the `apiResponse` envelope |
 | `lib/canvas/`, `lib/export/` | Konva helpers, fit maths, export pipeline |
 | `lib/devices/` | Frame geometry, catalog, orientation transform |
 | `lib/editor/` | Zustand store, slices, persistence |
@@ -83,10 +85,12 @@ Four decisions everything else follows from:
 ## Conventions
 
 - **Ownership is a filter clause, never a post-fetch comparison.**
-  `Project.findOne({ _id, userId })`, and failures return `NOT_FOUND` so ids
-  cannot be enumerated. No action takes a `userId` parameter.
-- **Every server action returns `ActionResult<T>`** — one shape, produced by
-  `withAction`, which also runs the auth guard, zod parsing and DB connect.
+  `Project.findOne({ _id, userId })`, and failures return 404 so ids
+  cannot be enumerated. No route reads a userId from the query or body.
+- **Backend calls flow UI → server action → `apiClient` → API route → database.**
+  Every route is wrapped in `asyncHandler` (auth guard, zod parsing, DB connect,
+  error mapping) and answers with the one `{ status, message, data }` envelope
+  from `apiResponse`.
 - **Every catch re-throws Next control-flow errors first.** `redirect()` works by
   throwing; swallowing it turns an auth redirect into a silent no-op.
 - **Routes live in `config/routes.ts`.** Never hardcode a path.

@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import {
-  createDeviceAction,
-  updateDeviceAction,
-} from "@/actions/devices/deviceActions";
+import { createDevice, updateDevice } from "@/actions/devices/deviceActions";
 import { ColorPicker } from "@/components/common/color-picker";
 import { DeviceSilhouette } from "@/components/common/device-silhouette";
 import { Button } from "@/components/ui/button";
@@ -176,16 +173,18 @@ export function DeviceFormDialog({
 
   const submit = () => {
     startTransition(async () => {
-      const payload = toPayload(form);
+      // The raw strings are what the API's zod schema coerces and validates.
+      const payload = toPayload(form) as unknown as DeviceInput;
       const result = device
-        ? await updateDeviceAction({ ...payload, id: device.id })
-        : await createDeviceAction(payload);
+        ? await updateDevice(device.id, payload)
+        : await createDevice(payload);
 
-      if (!result.success) {
-        const fieldError = Object.values(result.error.fieldErrors ?? {})
-          .flat()
-          .find(Boolean);
-        toast.error(fieldError ?? result.error.message);
+      if (!result?.status) {
+        // On validation failure the envelope's `data` is a { field: message }
+        // map; surface the first field message when there is one.
+        const details = (result?.data ?? {}) as Record<string, string>;
+        const fieldError = Object.values(details).find(Boolean);
+        toast.error(fieldError ?? result?.message ?? "Could not save the device.");
         return;
       }
 

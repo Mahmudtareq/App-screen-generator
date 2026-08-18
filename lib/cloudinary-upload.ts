@@ -18,13 +18,20 @@ export interface UploadedAsset {
   format: string;
 }
 
-interface SignResponse {
+interface SignData {
   timestamp: number;
   signature: string;
   apiKey: string;
   cloudName: string;
   folder: string;
   publicId: string;
+}
+
+/** The API's `{ status, message, data }` envelope around the signature. */
+interface SignResponse {
+  status: boolean;
+  message: string;
+  data: SignData;
 }
 
 /**
@@ -52,7 +59,11 @@ export async function uploadToCloudinary(
     );
   }
 
-  const signed: SignResponse = await signResponse.json();
+  const envelope: SignResponse = await signResponse.json();
+  if (!envelope?.status || !envelope.data) {
+    throw new Error(envelope?.message || "Could not start the upload.");
+  }
+  const signed = envelope.data;
 
   const form = new FormData();
   form.append("file", file);

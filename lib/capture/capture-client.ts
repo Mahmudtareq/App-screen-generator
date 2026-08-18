@@ -1,3 +1,4 @@
+import { routes } from "@/config/routes";
 import type { Orientation } from "@/lib/devices/types";
 
 /**
@@ -13,7 +14,7 @@ export async function captureWebsite(options: {
   orientation: Orientation;
   fullPage?: boolean;
 }): Promise<File> {
-  const response = await fetch("/api/capture", {
+  const response = await fetch(routes.api.capture, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -25,10 +26,16 @@ export async function captureWebsite(options: {
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null;
-    throw new Error(body?.error ?? "The screenshot could not be taken.");
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      data?: Record<string, string>;
+    } | null;
+    // A validation failure carries per-field messages in `data`; the URL field's
+    // own message reads better than the generic envelope message.
+    const fieldMessage = body?.data && Object.values(body.data).find(Boolean);
+    throw new Error(
+      fieldMessage ?? body?.message ?? "The screenshot could not be taken.",
+    );
   }
 
   const blob = await response.blob();

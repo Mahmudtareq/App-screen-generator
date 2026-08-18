@@ -25,15 +25,18 @@ export const updateProjectSchema = z.object({
   thumbnailUrl: z.url().nullable().optional(),
 });
 
-export const projectIdSchema = z.object({ id: objectIdSchema });
+/** The PATCH body — the id comes from the route path, never the payload. */
+export const updateProjectBodySchema = updateProjectSchema.omit({ id: true });
 
 export const listProjectsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(60).default(24),
+  search: z.string().trim().max(120).default(""),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type UpdateProjectBody = z.infer<typeof updateProjectBodySchema>;
 
 /** What the dashboard list needs — deliberately without the full editor doc. */
 export interface ProjectSummary {

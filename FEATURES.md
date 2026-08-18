@@ -1467,7 +1467,8 @@ email ownership. **Never enable it for a provider that does not.**
 **Files**
 
 - [app/(app)/dashboard/page.tsx](app/%28app%29/dashboard/page.tsx)
-- `listProjectsAction` in [actions/projects/projectActions.ts](actions/projects/projectActions.ts)
+- `getProjectList` in [actions/projects/projectActions.ts](actions/projects/projectActions.ts)
+  → `GET /api/projects` in [app/api/projects/route.ts](app/api/projects/route.ts)
 
 **How it works.** Paginated, `userId`-filtered, sorted by `updatedAt`. Projects the
 list query projects away `doc` — an editor document with a gradient and twenty text
@@ -1478,7 +1479,7 @@ layers is far larger than the card that displays it.
 **Backlog**
 
 - **Thumbnails are never generated.** The card renders `thumbnailUrl` and
-  `createProjectAction` accepts it, but nothing ever produces one, so every card is an
+  `createProject` accepts it, but nothing ever produces one, so every card is an
   empty grey frame. Generating one on save from screen 1's Stage at low pixel ratio is
   the obvious fix and pairs with [H2](#h2-asset-records).
 - **`duplicateProjectAction` and `deleteProjectAction` have no UI.** Both are written,
@@ -1555,5 +1556,5 @@ These are not features; breaking one causes a bug somewhere else entirely.
 | Honour `screen.pinned` in bulk writes | [B3](#b3-screen-pinning) | Silently overwrites hand-tuned work |
 | Image URLs nullable, never `""` | [A1](#a1-editor-document-model) | `""` fails the schema; whole draft is discarded |
 | Ownership as a filter clause | [CLAUDE.md](CLAUDE.md) | Races, and leaks whether an id exists |
-| Re-throw Next control-flow errors first | [lib/action.ts](lib/action.ts) | `redirect()` becomes a silent no-op |
+| Re-throw Next control-flow errors first | [lib/redirect-guard.ts](lib/redirect-guard.ts) | `redirect()` becomes a silent no-op |
 | `config/templates.ts` imports types only | [E1](#e1-templates) | Module cycle with the schema |

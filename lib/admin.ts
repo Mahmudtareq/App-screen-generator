@@ -13,8 +13,8 @@ import { env } from "@/config/env";
  * is exactly the right amount of ceremony.
  *
  * Checked server-side at every admin surface — the layout that renders the
- * pages, and `withAction({ admin: true })` for every mutation — never inferred
- * on the client.
+ * pages, and `asyncHandler(..., "admin")` for every mutation route — never
+ * inferred on the client.
  */
 const adminEmails = new Set(
   (env.ADMIN_EMAILS ?? "")

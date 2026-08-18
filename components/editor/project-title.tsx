@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-import { updateProjectAction } from "@/actions/projects/projectActions";
+import { updateProject } from "@/actions/projects/projectActions";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/lib/editor/store";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ const MAX_LENGTH = 120;
  *
  * One control covers both cases the name has, which is why it is not a dialog on
  * save: before a project exists, typing here is simply what the eventual
- * `createProjectAction` will be given; afterwards, committing writes the row
+ * `createProject` call will be given; afterwards, committing writes the row
  * straight away. A "name this" dialog in front of Save would ask the question at
  * the worst moment and still leave renaming unsolved.
  *
@@ -52,17 +52,17 @@ export function ProjectTitle({ projectId }: { projectId?: string }) {
     setProjectName(next);
 
     // An unsaved project has no row to rename — the value is simply carried to
-    // whichever `createProjectAction` call eventually happens.
+    // whichever `createProject` call eventually happens.
     if (!projectId) return;
 
     startSaving(async () => {
-      const result = await updateProjectAction({ id: projectId, name: next });
+      const result = await updateProject(projectId, { name: next });
 
-      if (!result.success) {
+      if (!result?.status) {
         // Put the old name back rather than leaving the bar showing a title the
         // database does not have.
         setProjectName(name);
-        toast.error(result.error.message);
+        toast.error(result?.message ?? "Could not rename this project.");
         return;
       }
 

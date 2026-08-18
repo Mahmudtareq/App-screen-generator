@@ -18,7 +18,16 @@ export const routes = {
     devices: "/admin/devices",
   },
   api: {
+    register: "/api/auth/register",
+    projects: "/api/projects",
+    project: (id: string) => `/api/projects/${id}`,
+    projectDuplicate: (id: string) => `/api/projects/${id}/duplicate`,
+    assets: "/api/assets",
+    asset: (id: string) => `/api/assets/${id}`,
+    adminDevices: "/api/admin/devices",
+    adminDevice: (id: string) => `/api/admin/devices/${id}`,
     cloudinarySign: "/api/cloudinary/sign",
+    capture: "/api/capture",
   },
 } as const;
 

@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  createProjectAction,
-  updateProjectAction,
-} from "@/actions/projects/projectActions";
+import { createProject, updateProject } from "@/actions/projects/projectActions";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { clearDraft, prepareDocForSave } from "@/lib/editor/persistence";
@@ -48,8 +45,8 @@ export function SaveButton({
         const doc = await prepareDocForSave(state);
 
         const result = projectId
-          ? await updateProjectAction({ id: projectId, doc })
-          : await createProjectAction({
+          ? await updateProject(projectId, { doc })
+          : await createProject({
               // Trimmed-empty falls back too — `??` alone would send "" and fail
               // the name's own min(1) rather than saving.
               name: state.projectName.trim() || UNTITLED,
@@ -57,8 +54,8 @@ export function SaveButton({
               thumbnailUrl: null,
             });
 
-        if (!result.success) {
-          toast.error(result.error.message);
+        if (!result?.status) {
+          toast.error(result?.message ?? "Could not save this project.");
           return;
         }
 

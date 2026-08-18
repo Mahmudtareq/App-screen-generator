@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  deleteDeviceAction,
-  updateDeviceAction,
-} from "@/actions/devices/deviceActions";
+import { deleteDevice, updateDevice } from "@/actions/devices/deviceActions";
 import { DeviceSilhouette } from "@/components/common/device-silhouette";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,9 +62,9 @@ export function DeviceManager({
 
   const toggleEnabled = (row: CustomDeviceRow, enabled: boolean) => {
     startTransition(async () => {
-      const result = await updateDeviceAction({ ...row, enabled });
-      if (!result.success) {
-        toast.error(result.error.message);
+      const result = await updateDevice(row.id, { ...row, enabled });
+      if (!result?.status) {
+        toast.error(result?.message ?? "Could not update the device.");
         return;
       }
       toast.success(enabled ? `${row.name} enabled` : `${row.name} hidden from the editor`);
@@ -77,10 +74,10 @@ export function DeviceManager({
 
   const confirmDelete = (row: CustomDeviceRow) => {
     startTransition(async () => {
-      const result = await deleteDeviceAction({ id: row.id });
+      const result = await deleteDevice(row.id);
       setConfirming(null);
-      if (!result.success) {
-        toast.error(result.error.message);
+      if (!result?.status) {
+        toast.error(result?.message ?? "Could not delete the device.");
         return;
       }
       toast.success(`${row.name} deleted`);
