@@ -17,11 +17,16 @@ import { cn } from "@/lib/utils";
  */
 export function AppBar({
   active,
-  projectName,
+  title,
   user,
 }: {
   active?: "projects" | "templates" | "editor";
-  projectName?: string;
+  /**
+   * What sits between the nav and the account menu. A node rather than a string
+   * because the editor puts an editable project title there, and the bar has no
+   * business knowing how renaming works.
+   */
+  title?: React.ReactNode;
   /** The signed-in user, or null when anonymous — the bar's only session input. */
   user: SessionUser | null;
 }) {
@@ -62,17 +67,10 @@ export function AppBar({
         </NavLink>
       </nav>
 
-      {projectName && (
-        <span className="ml-auto truncate text-sm font-medium text-muted-foreground">
-          {projectName}
-        </span>
-      )}
+      {title && <div className="ml-auto min-w-0">{title}</div>}
 
       <div
-        className={cn(
-          "flex items-center gap-2",
-          !projectName ? "ml-auto" : "ml-3 shrink-0",
-        )}
+        className={cn("flex items-center gap-2", !title ? "ml-auto" : "ml-3 shrink-0")}
       >
         {user ? (
           <UserMenu user={user} />

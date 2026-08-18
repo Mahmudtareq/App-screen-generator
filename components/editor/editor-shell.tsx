@@ -6,6 +6,7 @@ import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useProjectBootstrap } from "@/hooks/use-project-bootstrap";
 
 import { AppBar } from "./app-bar";
+import { ProjectTitle } from "./project-title";
 import { EditorToolbar } from "./editor-toolbar";
 import { ExportDialog } from "./export/export-dialog";
 import { ScreenStrip } from "./screens/screen-strip";
@@ -37,20 +38,20 @@ export function EditorShell({
   initialDoc,
   user,
 }: EditorShellProps) {
-  const ready = useProjectBootstrap(initialDoc);
+  const ready = useProjectBootstrap(initialDoc, projectName);
   useEditorShortcuts();
 
   const signedIn = Boolean(user);
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppBar active="editor" projectName={projectName} user={user} />
-
-      <EditorToolbar
-        projectId={projectId}
-        projectName={projectName}
-        signedIn={signedIn}
+      <AppBar
+        active="editor"
+        title={<ProjectTitle projectId={projectId} />}
+        user={user}
       />
+
+      <EditorToolbar projectId={projectId} signedIn={signedIn} />
 
       {ready ? (
         <ScreenStrip />

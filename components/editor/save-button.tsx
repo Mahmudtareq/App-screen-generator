@@ -14,13 +14,13 @@ import { routes } from "@/config/routes";
 import { clearDraft, prepareDocForSave } from "@/lib/editor/persistence";
 import { useEditorStore } from "@/lib/editor/store";
 
+import { UNTITLED } from "./project-title";
+
 export function SaveButton({
   projectId,
-  projectName,
   signedIn,
 }: {
   projectId?: string;
-  projectName?: string;
   signedIn: boolean;
 }) {
   const router = useRouter();
@@ -50,7 +50,9 @@ export function SaveButton({
         const result = projectId
           ? await updateProjectAction({ id: projectId, doc })
           : await createProjectAction({
-              name: projectName ?? "Untitled mockup",
+              // Trimmed-empty falls back too — `??` alone would send "" and fail
+              // the name's own min(1) rather than saving.
+              name: state.projectName.trim() || UNTITLED,
               doc,
               thumbnailUrl: null,
             });

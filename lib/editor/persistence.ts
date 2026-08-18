@@ -17,6 +17,12 @@ import type { EditorState } from "./state";
 import { backgroundAssetKey, layerAssetKey, type AssetKey } from "./types";
 
 export const DRAFT_KEY = "editor:draft:v1";
+/**
+ * A sibling key rather than a field inside the draft: the name is a `Project`
+ * column, not part of `EditorDoc`, and folding it into the draft would mean the
+ * stored draft no longer parses as the document schema it is read back through.
+ */
+export const DRAFT_NAME_KEY = "editor:draft-name:v1";
 
 /**
  * Migrations from older `doc.version` values, applied in order.
@@ -223,9 +229,26 @@ export function loadDraft(): EditorDoc | null {
   }
 }
 
+export function saveDraftName(name: string) {
+  try {
+    localStorage.setItem(DRAFT_NAME_KEY, name);
+  } catch {
+    // Same reasoning as saveDraft: an autosave is not worth an interruption.
+  }
+}
+
+export function loadDraftName(): string {
+  try {
+    return localStorage.getItem(DRAFT_NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function clearDraft() {
   try {
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(DRAFT_NAME_KEY);
   } catch {
     // Nothing useful to do.
   }

@@ -53,11 +53,9 @@ const PRESET_GROUPS = [...new Set(ARTBOARD_PRESETS.map((p) => p.group))];
  */
 export function EditorToolbar({
   projectId,
-  projectName,
   signedIn,
 }: {
   projectId?: string;
-  projectName?: string;
   signedIn: boolean;
 }) {
   const artboard = useEditorStore((s) => s.doc.artboard);
@@ -103,11 +101,7 @@ export function EditorToolbar({
         </Link>
       </Button>
 
-      <SaveButton
-        projectId={projectId}
-        projectName={projectName}
-        signedIn={signedIn}
-      />
+      <SaveButton projectId={projectId} signedIn={signedIn} />
 
       <TemplatePicker>
         <Button

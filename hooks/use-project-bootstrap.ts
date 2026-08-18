@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { loadDraft, migrateDoc, saveDraft } from "@/lib/editor/persistence";
+import {
+  loadDraft,
+  loadDraftName,
+  migrateDoc,
+  saveDraft,
+  saveDraftName,
+} from "@/lib/editor/persistence";
 import { useEditorStore } from "@/lib/editor/store";
 import { debounce } from "@/lib/utils";
 import type { EditorDoc } from "@/schemas/editor";
@@ -23,12 +29,17 @@ const AUTOSAVE_MS = 1500;
  * written before the multi-screen schema still arrives shaped like the old one, and
  * the declared `EditorDoc` type is a claim about it rather than a guarantee.
  *
+ * The project's name rides along on both paths — restored from the row for a saved
+ * project and from its own draft key otherwise, so a title typed before signing up
+ * survives the round trip through registration just as the screens do.
+ *
  * Draft autosave is deliberately skipped once a project id exists: a saved
  * project's source of truth is the database, and mirroring it into localStorage
  * would resurrect stale work the next time the anonymous editor is opened.
  */
-export function useProjectBootstrap(initialDoc?: unknown) {
+export function useProjectBootstrap(initialDoc?: unknown, initialName?: string) {
   const loadDoc = useEditorStore((s) => s.loadDoc);
+  const setProjectName = useEditorStore((s) => s.setProjectName);
   const [ready, setReady] = useState(false);
   const bootstrapped = useRef(false);
   const hasProject = initialDoc !== undefined;
@@ -40,18 +51,26 @@ export function useProjectBootstrap(initialDoc?: unknown) {
     const restored = hasProject ? migrateDoc(initialDoc) : loadDraft();
     if (restored) loadDoc(restored);
 
+    // The name travels the same two paths as the document, and through the store
+    // rather than React state: reading localStorage during render would not match
+    // what the server rendered, and seeding it from an effect is what the
+    // set-state-in-effect rule exists to stop.
+    setProjectName(hasProject ? (initialName ?? "") : loadDraftName());
+
     // History starts here: the initial load is not something to undo back past.
     useEditorStore.temporal.getState().clear();
     setReady(true);
-  }, [initialDoc, hasProject, loadDoc]);
+  }, [initialDoc, initialName, hasProject, loadDoc, setProjectName]);
 
   useEffect(() => {
     if (!ready || hasProject) return;
 
     const persist = debounce((doc: EditorDoc) => saveDraft(doc), AUTOSAVE_MS);
+    const persistName = debounce((name: string) => saveDraftName(name), AUTOSAVE_MS);
 
     return useEditorStore.subscribe((state, previous) => {
       if (state.doc !== previous.doc) persist(state.doc);
+      if (state.projectName !== previous.projectName) persistName(state.projectName);
     });
   }, [ready, hasProject]);
 

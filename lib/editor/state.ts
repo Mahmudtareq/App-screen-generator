@@ -123,12 +123,21 @@ export interface UiSlice {
   isExporting: boolean;
   /** Which screen the export dialog is open for; null means closed. */
   exportScreenId: string | null;
+  /**
+   * The project's name, which is a `Project` column rather than part of the editor
+   * document — so it lives here, in the un-partialized half of the store, and is
+   * neither serialised into `doc` nor pushed onto the undo stack. Typing a title
+   * should not be something Cmd+Z walks back through.
+   */
+  projectName: string;
 
   setAsset: (asset: EditorAsset) => void;
   updateAsset: (key: AssetKey, patch: Partial<EditorAsset>) => void;
   clearAsset: (key: AssetKey) => void;
   /** Releases every object URL belonging to a screen, when that screen is deleted. */
   clearScreenAssets: (screenId: string) => void;
+
+  setProjectName: (name: string) => void;
 
   setExporting: (isExporting: boolean) => void;
   openExport: (screenId: string) => void;
