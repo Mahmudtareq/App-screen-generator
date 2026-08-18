@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Layers, LayoutGrid, LayoutTemplate, PenLine } from "lucide-react";
 
+import { UserMenu, type SessionUser } from "@/components/auth/user-menu";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
@@ -17,12 +18,15 @@ import { cn } from "@/lib/utils";
 export function AppBar({
   active,
   projectName,
-  signedIn,
+  user,
 }: {
   active?: "projects" | "templates" | "editor";
   projectName?: string;
-  signedIn: boolean;
+  /** The signed-in user, or null when anonymous — the bar's only session input. */
+  user: SessionUser | null;
 }) {
+  const signedIn = Boolean(user);
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
       <Link href={routes.public.home} className="flex items-center gap-2">
@@ -64,16 +68,25 @@ export function AppBar({
         </span>
       )}
 
-      {!signedIn && (
-        <div className={cn("flex items-center gap-2", !projectName && "ml-auto")}>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={routes.public.login}>Sign in</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href={routes.public.register}>Sign up free</Link>
-          </Button>
-        </div>
-      )}
+      <div
+        className={cn(
+          "flex items-center gap-2",
+          !projectName ? "ml-auto" : "ml-3 shrink-0",
+        )}
+      >
+        {user ? (
+          <UserMenu user={user} />
+        ) : (
+          <>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={routes.public.login}>Sign in</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={routes.public.register}>Sign up free</Link>
+            </Button>
+          </>
+        )}
+      </div>
     </header>
   );
 }

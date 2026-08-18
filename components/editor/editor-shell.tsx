@@ -1,5 +1,6 @@
 "use client";
 
+import type { SessionUser } from "@/components/auth/user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useProjectBootstrap } from "@/hooks/use-project-bootstrap";
@@ -18,7 +19,8 @@ export interface EditorShellProps {
    * it through `migrateDoc` rather than trusting the declared type.
    */
   initialDoc?: unknown;
-  signedIn: boolean;
+  /** The signed-in user, or null when anonymous. Saving needs one; editing does not. */
+  user: SessionUser | null;
 }
 
 /**
@@ -33,21 +35,16 @@ export function EditorShell({
   projectId,
   projectName,
   initialDoc,
-  signedIn,
+  user,
 }: EditorShellProps) {
   const ready = useProjectBootstrap(initialDoc);
   useEditorShortcuts();
-  console.log("EditorShell render", {
-    projectId,
-    projectName,
-    initialDoc,
-    signedIn,
-    ready,
-  });
+
+  const signedIn = Boolean(user);
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppBar active="editor" projectName={projectName} signedIn={signedIn} />
+      <AppBar active="editor" projectName={projectName} user={user} />
 
       <EditorToolbar
         projectId={projectId}

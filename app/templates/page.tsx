@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
 import { AppBar } from "@/components/editor/app-bar";
 import { TemplateGallery } from "@/components/editor/template-gallery";
+import { getSessionUser } from "@/lib/session-user";
 
 export const metadata = {
   title: "Templates · Mockup Studio",
@@ -14,11 +14,11 @@ export const metadata = {
  * entirely in the browser. Signing in is required to *save*.
  */
 export default async function TemplatesPage() {
-  const session = await auth();
+  const user = await getSessionUser();
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppBar active="templates" signedIn={Boolean(session?.user?.id)} />
+      <AppBar active="templates" user={user} />
 
       <main className="mx-auto w-full max-w-5xl px-6 py-10">
         <div className="space-y-2">

@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
 import { EditorShell } from "@/components/editor/editor-shell";
+import { getSessionUser } from "@/lib/session-user";
 
 export const metadata = {
   title: "Editor · Mockup Studio",
@@ -13,7 +13,7 @@ export const metadata = {
  * browser. Work is kept in a local draft until they choose to save it.
  */
 export default async function EditorPage() {
-  const session = await auth();
+  const user = await getSessionUser();
 
-  return <EditorShell signedIn={Boolean(session?.user?.id)} />;
+  return <EditorShell user={user} />;
 }
