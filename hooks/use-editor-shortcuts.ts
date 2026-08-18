@@ -32,12 +32,16 @@ export function useEditorShortcuts() {
       if (isTextEntry(event.target)) return;
 
       if (event.key === "Escape") {
-        store.clearSelection();
+        // Step out one level at a time: drop the layer first, and only close the
+        // inspector on a second press. Collapsing both at once means one stray
+        // Escape loses the panel someone was working in.
+        if (store.layerId) store.clearLayerSelection();
+        else store.clearSelection();
         return;
       }
 
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (!store.selectedId) return;
+        if (!store.layerId) return;
         event.preventDefault();
         store.deleteSelected();
       }

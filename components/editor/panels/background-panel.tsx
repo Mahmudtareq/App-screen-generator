@@ -1,57 +1,74 @@
 "use client";
 
+import { CopyCheck } from "lucide-react";
+import { toast } from "sonner";
+
 import { ColorPicker } from "@/components/common/color-picker";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { selectScreen } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
+import { backgroundAssetKey } from "@/lib/editor/types";
 import type { BackgroundType } from "@/schemas/editor";
 
 import { ImageDropzone } from "../upload/image-dropzone";
-import { Field, PanelSection } from "./panel-section";
+import { Field } from "./panel-section";
 
 const PRESETS = [
-  "#eef2f7",
+  "#f4f1ff",
+  "#e4dcfb",
+  "#6d28d9",
   "#0f172a",
   "#ffffff",
   "#fef3c7",
   "#dbeafe",
   "#dcfce7",
-  "#fae8ff",
   "#ffe4e6",
 ];
 
-export function BackgroundPanel() {
-  const background = useEditorStore((s) => s.doc.background);
-  const setBackground = useEditorStore((s) => s.setBackground);
+/** One screen's background. */
+export function BackgroundPanel({ screenId }: { screenId: string }) {
+  const background = useEditorStore(
+    (s) => selectScreen(screenId)(s)?.background,
+  );
+  const screenCount = useEditorStore((s) => s.doc.screens.length);
+  const setScreenBackground = useEditorStore((s) => s.setScreenBackground);
+  const applyBackgroundToAll = useEditorStore((s) => s.applyBackgroundToAll);
   const clearAsset = useEditorStore((s) => s.clearAsset);
+
+  if (!background) return null;
+
+  const set = (next: Parameters<typeof setScreenBackground>[1]) =>
+    setScreenBackground(screenId, next);
 
   const changeType = (type: BackgroundType) => {
     if (type === background.type) return;
 
     switch (type) {
       case "transparent":
-        setBackground({ type: "transparent" });
+        set({ type: "transparent" });
         break;
       case "color":
-        setBackground({ type: "color", color: "#eef2f7" });
+        set({ type: "color", color: "#f4f1ff" });
         break;
       case "gradient":
-        setBackground({
+        set({
           type: "gradient",
-          angle: 135,
+          angle: 150,
           stops: [
-            { offset: 0, color: "#6366f1" },
-            { offset: 1, color: "#ec4899" },
+            { offset: 0, color: "#6d28d9" },
+            { offset: 1, color: "#4c1d95" },
           ],
         });
         break;
       case "image":
-        // The url stays empty until a file is dropped; the canvas simply renders
+        // The url stays null until a file is dropped; the canvas simply renders
         // nothing until then rather than blocking the type switch.
-        setBackground({
+        set({
           type: "image",
           assetId: null,
-          url: "",
+          url: null,
           fit: "cover",
           blur: 0,
           opacity: 1,
@@ -61,12 +78,13 @@ export function BackgroundPanel() {
   };
 
   return (
-    <PanelSection title="Background">
+    <div className="space-y-3">
       <ToggleGroup
         type="single"
         value={background.type}
         onValueChange={(v) => v && changeType(v as BackgroundType)}
         variant="outline"
+        size="sm"
         className="w-full"
       >
         <ToggleGroupItem value="color" className="flex-1 text-xs">
@@ -87,7 +105,7 @@ export function BackgroundPanel() {
         <>
           <ColorPicker
             value={background.color}
-            onChange={(color) => setBackground({ type: "color", color })}
+            onChange={(color) => set({ type: "color", color })}
           />
           <div className="flex flex-wrap gap-1.5">
             {PRESETS.map((color) => (
@@ -97,7 +115,7 @@ export function BackgroundPanel() {
                 aria-label={color}
                 className="size-6 rounded-md border shadow-sm transition-transform hover:scale-110"
                 style={{ backgroundColor: color }}
-                onClick={() => setBackground({ type: "color", color })}
+                onClick={() => set({ type: "color", color })}
               />
             ))}
           </div>
@@ -110,9 +128,12 @@ export function BackgroundPanel() {
             <ColorPicker
               value={background.stops[0].color}
               onChange={(color) =>
-                setBackground({
+                set({
                   ...background,
-                  stops: [{ ...background.stops[0], color }, ...background.stops.slice(1)],
+                  stops: [
+                    { ...background.stops[0], color },
+                    ...background.stops.slice(1),
+                  ],
                 })
               }
             />
@@ -121,7 +142,7 @@ export function BackgroundPanel() {
             <ColorPicker
               value={background.stops[background.stops.length - 1].color}
               onChange={(color) =>
-                setBackground({
+                set({
                   ...background,
                   stops: [
                     ...background.stops.slice(0, -1),
@@ -137,7 +158,7 @@ export function BackgroundPanel() {
               max={360}
               step={1}
               value={[background.angle]}
-              onValueChange={([angle]) => setBackground({ ...background, angle })}
+              onValueChange={([angle]) => set({ ...background, angle })}
             />
           </Field>
         </>
@@ -145,16 +166,21 @@ export function BackgroundPanel() {
 
       {background.type === "image" && (
         <>
-          <ImageDropzone slot="background" label="Background image" />
+          <ImageDropzone
+            assetKey={backgroundAssetKey(screenId)}
+            label="Background image"
+            compact
+          />
 
           <Field label="Fit">
             <ToggleGroup
               type="single"
               value={background.fit}
               onValueChange={(v) =>
-                v && setBackground({ ...background, fit: v as "cover" | "contain" })
+                v && set({ ...background, fit: v as "cover" | "contain" })
               }
               variant="outline"
+              size="sm"
               className="w-full"
             >
               <ToggleGroupItem value="cover" className="flex-1 text-xs">
@@ -166,13 +192,16 @@ export function BackgroundPanel() {
             </ToggleGroup>
           </Field>
 
-          <Field label="Opacity" hint={`${Math.round(background.opacity * 100)}%`}>
+          <Field
+            label="Opacity"
+            hint={`${Math.round(background.opacity * 100)}%`}
+          >
             <Slider
               min={0}
               max={1}
               step={0.01}
               value={[background.opacity]}
-              onValueChange={([opacity]) => setBackground({ ...background, opacity })}
+              onValueChange={([opacity]) => set({ ...background, opacity })}
             />
           </Field>
 
@@ -180,14 +209,29 @@ export function BackgroundPanel() {
             type="button"
             className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             onClick={() => {
-              clearAsset("background");
-              setBackground({ type: "color", color: "#eef2f7" });
+              clearAsset(backgroundAssetKey(screenId));
+              set({ type: "color", color: "#f4f1ff" });
             }}
           >
             Remove image
           </button>
         </>
       )}
-    </PanelSection>
+
+      {screenCount > 1 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          onClick={() => {
+            applyBackgroundToAll(screenId);
+            toast.success("Background applied to the other screens");
+          }}
+        >
+          <CopyCheck className="size-3.5" />
+          Apply to all screens
+        </Button>
+      )}
+    </div>
   );
 }

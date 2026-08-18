@@ -13,21 +13,24 @@ import {
   MAX_UPLOAD_BYTES,
 } from "@/lib/editor/assets";
 import { useEditorStore } from "@/lib/editor/store";
-import type { AssetSlot, EditorAsset } from "@/lib/editor/types";
+import type { AssetKey, EditorAsset } from "@/lib/editor/types";
 
 export function ImageDropzone({
-  slot,
+  assetKey,
   label,
   hint,
+  compact = false,
   onAccepted,
 }: {
-  slot: AssetSlot;
+  assetKey: AssetKey;
   label: string;
   hint?: string;
+  /** Tighter styling, for a dropzone nested inside a layer row. */
+  compact?: boolean;
   onAccepted?: (asset: EditorAsset) => void;
 }) {
   const setAsset = useEditorStore((s) => s.setAsset);
-  const asset = useEditorStore((s) => s.assets[slot]);
+  const asset = useEditorStore((s) => s.assets[assetKey]);
 
   const onDrop = useCallback(
     async (files: File[]) => {
@@ -41,14 +44,14 @@ export function ImageDropzone({
       }
 
       try {
-        const next = await createLocalAsset(file, slot);
+        const next = await createLocalAsset(file, assetKey);
         setAsset(next);
         onAccepted?.(next);
       } catch {
         toast.error("That image could not be read. It may be corrupt.");
       }
     },
-    [slot, setAsset, onAccepted],
+    [assetKey, setAsset, onAccepted],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -64,7 +67,8 @@ export function ImageDropzone({
     <div
       {...getRootProps()}
       className={cn(
-        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors",
+        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-center transition-colors",
+        compact ? "gap-1 p-3" : "p-6",
         isDragActive
           ? "border-primary bg-primary/5"
           : "border-border hover:border-primary/50 hover:bg-accent/40",
@@ -73,20 +77,22 @@ export function ImageDropzone({
       <input {...getInputProps()} />
 
       {uploading ? (
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
       ) : (
-        <ImageUp className="size-5 text-muted-foreground" />
+        <ImageUp className={cn("text-muted-foreground", compact ? "size-4" : "size-5")} />
       )}
 
       <div className="space-y-0.5">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">
-          {hint ?? "Drop an image, or click to browse"}
-        </p>
+        <p className={cn("font-medium", compact ? "text-xs" : "text-sm")}>{label}</p>
+        {!compact && (
+          <p className="text-xs text-muted-foreground">
+            {hint ?? "Drop an image, or click to browse"}
+          </p>
+        )}
       </div>
 
       {asset && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           {asset.width} × {asset.height}
           {uploading && ` · uploading ${Math.round(asset.progress * 100)}%`}
           {asset.status === "error" && " · upload failed"}

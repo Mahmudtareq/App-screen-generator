@@ -1,7 +1,7 @@
 # Mockup Studio
 
-Drop a phone screenshot into a device frame, add a background and captions, and
-export a polished mockup at App Store resolution.
+Pick a template, get five App Store screens side by side, drop a screenshot into
+each device frame, and export at store resolution.
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/ui ·
 Konva · Zustand · Mongoose · Auth.js v5 · Cloudinary.
@@ -38,20 +38,28 @@ startup error rather than a confusing failure later.
 
 ## How it fits together
 
-```
-Konva Stage (artboard px)  →  Zustand `doc` slice  →  Project.doc (Mongo)
-      │                                                      ▲
-      └─ screenshots/logos ─→ signed direct upload ─→ Cloudinary ─┘
+A project is a **set of screens**: five frames sharing one device, orientation and
+canvas size, differing in artwork and copy. They sit in a horizontally scrolling
+filmstrip, and clicking one opens its inspector inline beside it.
+
+```text
+5 Konva Stages (artboard px)  →  Zustand `doc.screens[]`  →  Project.doc (Mongo)
+      │                                                            ▲
+      └─ screenshots/images ─→ signed direct upload ─→ Cloudinary ──┘
 ```
 
-Three decisions everything else follows from:
+Four decisions everything else follows from:
 
 1. **The editor's `doc` slice is the persisted document.** Saving is
    `updateProject(id, doc)` with no field mapping in between.
-2. **Device frames are drawn from data, not composited from PNGs.**
+2. **A screen's content is an ordered layer array**, not named slots.
+   `layers[0]` paints first and sits at the back. This is what lets an image go
+   *behind* the device and another one in front of it — the same component twice,
+   differing only in where it sits in the array.
+3. **Device frames are drawn from data, not composited from PNGs.**
    `config`-style specs in `lib/devices/catalog.ts` drive Konva primitives, so
    frames stay crisp at any export scale and carry no asset licensing.
-3. **Everything drawn on the canvas loads through `lib/canvas/image-cache.ts`**
+4. **Everything drawn on the canvas loads through `lib/canvas/image-cache.ts`**
    — fetched as a Blob and rendered from a `blob:` URL. This is what keeps the
    canvas origin-clean; see the comment in that file for why `crossOrigin`
    alone is not enough.
@@ -60,14 +68,17 @@ Three decisions everything else follows from:
 
 | Path | What lives there |
 |---|---|
-| `app/` | Routes. `editor/` is public; `dashboard/` and `editor/[projectId]/` are not |
+| `app/` | Routes. `editor/` and `templates/` are public; `dashboard/` and `editor/[projectId]/` are not |
 | `actions/<domain>/` | Server actions, `"use server"` on line 1 |
 | `lib/action.ts` | The one `ActionResult` envelope and the `withAction` wrapper |
 | `lib/canvas/`, `lib/export/` | Konva helpers, fit maths, export pipeline |
 | `lib/devices/` | Frame geometry, catalog, orientation transform |
 | `lib/editor/` | Zustand store, slices, persistence |
+| `config/templates.ts` | The starter templates, as static data |
 | `models/`, `schemas/` | Mongoose models, zod contracts |
 | `components/canvas/` | The only place `react-konva` is imported |
+| `components/editor/screens/` | The filmstrip, cards and per-screen actions |
+| `components/editor/panels/` | The inspector and its per-layer panels |
 
 ## Conventions
 
@@ -79,9 +90,18 @@ Three decisions everything else follows from:
 - **Every catch re-throws Next control-flow errors first.** `redirect()` works by
   throwing; swallowing it turns an auth redirect into a silent no-op.
 - **Routes live in `config/routes.ts`.** Never hardcode a path.
-- **`components/canvas/canvas-stage.tsx` is the only top-level `react-konva`
-  import.** A stray one elsewhere pulls Konva into the server bundle and fails
-  `pnpm build` — which is what makes the build a useful canary.
+- **`react-konva` is imported only under `components/canvas/`.** The whole subtree
+  is reached through the `ssr: false` dynamic import in `canvas-host.tsx`. A stray
+  import elsewhere pulls Konva into the server bundle and fails `pnpm build` —
+  which is what makes the build a useful canary.
+- **One Stage per screen**, registered by screen id in `lib/canvas/stage-registry.ts`.
+  Export is then handed a Stage holding exactly one artboard, instead of having to
+  rasterise a sub-region of a five-artboard-wide one.
+- **`screen.pinned` opts a screen out of bulk writes** — apply-to-all, template
+  restyle, artboard retarget. Anything new that writes across the set must honour it.
+- **Document image URLs are nullable, never `""`.** An empty string fails
+  `assetUrlSchema`, which means a document holding one fails its own schema and the
+  whole draft is dropped on reload.
 
 ## Verifying changes
 
@@ -92,9 +112,13 @@ pnpm lint && pnpm type-check && pnpm build
 The build doubles as the check that Konva has not leaked server-side. Beyond
 that, the things worth exercising by hand:
 
-- Export at 3× and confirm `toBlob` resolves (the canvas-tainting canary).
+- Export a screen at the highest enabled scale and confirm `toBlob` resolves (the
+  canvas-tainting canary). At App Store 6.9" that is 2×: 1290×2796 at 3× is 32MP
+  and the dimension guard disables it on purpose.
 - Hard-refresh with the cache disabled and compare the preview's line breaks
   against the exported image — they must match, or a font loaded late.
+- Add and delete screens, and confirm the last one cannot be deleted.
+- Restack a layer and re-export; the new order must survive.
 - Sign in as a second user and open the first user's project id; expect a 404.
 
 ## Known gaps
@@ -103,5 +127,7 @@ that, the things worth exercising by hand:
   notch geometry come from published screen resolutions with estimated bezels.
   Each device needs a pass against a real product photo before it ships.
 - Thumbnails are not generated yet, so dashboard cards show an empty frame.
-- Batch export across devices is not built; it is the first feature that
-  genuinely needs server-side compositing.
+- **Two templates.** Adding a third is a data-only change in `config/templates.ts`.
+- Export is one screen at a time. Exporting a whole set needs server-side
+  compositing — five 32MP canvases in one browser is how this runs out of memory.
+- Screens reorder with arrow buttons, not drag-and-drop.
