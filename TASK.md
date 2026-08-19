@@ -526,6 +526,40 @@ modal (AppScreens-style sidebar) with **Preview** (all screens) and **Download**
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean; ZIP output
 validated with `unzip -t` (CRCs OK, contents extract byte-exact).
 
+### 22. Background panel — radial gradients, presets, picker-backed images (doc v9) ✅
+**19 Aug 2026**
+
+Asked for: restyle the Background panel toward the AppScreens reference —
+swatch-style type buttons, radial gradients with centre/outer + from/to %,
+gradient presets, and background images chosen through the same picker dialog
+image layers use.
+
+1. **Doc v8 → v9**: `backgroundSchema` gains a `radial` variant (stops run
+   centre → corner; offsets are fractions of the half-diagonal), and the image
+   variant gains `align` (top/center/bottom) and `rotation` (quarter turns),
+   both defaulting to the old behaviour. Stamp-only `MIGRATIONS[8]`. Rendering
+   in `background-layer.tsx` (`fillRadialGradient*`, end radius = half
+   diagonal; the image background became a positioned `Image` node so
+   rotation/alignment are plain geometry — the layer's artboard clip and the
+   export crop bound the cover overflow), CSS approximation in
+   `template-preview.ts`, `selectOpaqueFallback` and the colour replacer's
+   `mapScreenColors` all handle it.
+2. **Panel redesign** (`background-panel.tsx`): the labelled tab row became
+   swatch-shaped style buttons (none / solid / linear / radial / image) that
+   show the live style, plus a **Presets** popover of twelve ready-made
+   linear/radial looks applied whole. Gradients get a 72px live preview
+   square, From/To (or Centre/Outer) colour+hex rows, a direction-flip /
+   swap-colours control, and radial gets From/To % stop positions.
+3. **Background images go through the image picker**: "Select background"
+   opens `ImagePickerDialog` on `backgroundAssetKey(screenId)` via
+   `useApplyImagePick` — upload, library and project-image tabs included —
+   closing the FEATURES backlog item about the background's separate dropzone.
+   The swatch shows what the canvas currently draws (local URL before upload).
+4. Unchanged: fit/opacity/remove, apply-to-all (still skips pinned screens),
+   solid presets, and every other panel.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
 ---
 
 ## Open

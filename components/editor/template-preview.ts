@@ -12,5 +12,11 @@ export function backgroundPreviewCss(background: Background): string {
       .join(", ");
     return `linear-gradient(${background.angle}deg, ${stops})`;
   }
+  if (background.type === "radial") {
+    const stops = background.stops
+      .map((stop) => `${stop.color} ${Math.round(stop.offset * 100)}%`)
+      .join(", ");
+    return `radial-gradient(circle at center, ${stops})`;
+  }
   return "#e5e7eb";
 }

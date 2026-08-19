@@ -201,6 +201,15 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * fail the enum parse and drop the draft whole.
    */
   7: (doc) => ({ ...doc, version: 8 }),
+
+  /**
+   * v8 → v9: the background union gains a `radial` gradient variant, and an
+   * image background gains `align` and `rotation`. No v8 document holds a
+   * radial, and the new fields default to the old behaviour (centred,
+   * unrotated), so this only stamps the version — the stamp tells older
+   * clients the document may hold a background they cannot parse.
+   */
+  8: (doc) => ({ ...doc, version: 9 }),
 };
 
 /**

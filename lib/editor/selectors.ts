@@ -161,6 +161,8 @@ export function selectOpaqueFallback(
   const background = selectScreen(screenId)(state)?.background;
 
   if (background?.type === "color") return background.color;
-  if (background?.type === "gradient") return background.stops[0].color;
+  if (background?.type === "gradient" || background?.type === "radial") {
+    return background.stops[0].color;
+  }
   return "#ffffff";
 }

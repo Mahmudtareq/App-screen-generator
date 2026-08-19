@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 8;
+export const EDITOR_DOC_VERSION = 9;
 
 const hexColorSchema = z
   .string()
@@ -87,11 +87,26 @@ export const backgroundSchema = z.discriminatedUnion("type", [
     angle: z.number().min(0).max(360),
     stops: z.array(gradientStopSchema).min(2).max(8),
   }),
+  /**
+   * Radial: painted from the artboard's centre outward. Stops run centre →
+   * edge; their offsets are fractions of the half-diagonal, so offset 1 lands
+   * exactly in the corners.
+   */
+  z.object({
+    type: z.literal("radial"),
+    stops: z.array(gradientStopSchema).min(2).max(8),
+  }),
   z.object({
     type: z.literal("image"),
     assetId: objectIdStringSchema.nullable().default(null),
     url: assetUrlSchema.nullable().default(null),
     fit: z.enum(["cover", "contain"]).default("cover"),
+    /** Which band survives a cover crop (or where a contained image sits). */
+    align: z.enum(["top", "center", "bottom"]).default("center"),
+    /** Quarter turns only — arbitrary angles leave wedges of nothing behind. */
+    rotation: z
+      .union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)])
+      .default(0),
     blur: z.number().min(0).max(100).default(0),
     opacity: z.number().min(0).max(1).default(1),
   }),
