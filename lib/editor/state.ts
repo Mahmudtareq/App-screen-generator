@@ -2,6 +2,7 @@ import type { Orientation } from "@/lib/devices/types";
 import type {
   Artboard,
   Background,
+  CornerRadii,
   EditorDoc,
   LayerKind,
   Screen,
@@ -67,6 +68,14 @@ export interface DocumentSlice {
   moveScreen: (screenId: string, direction: "left" | "right") => void;
   renameScreen: (screenId: string, name: string) => void;
   setScreenPinned: (screenId: string, pinned: boolean) => void;
+  /** Per-corner rounding of the exported frame; zero corners is a square export. */
+  setScreenCorners: (screenId: string, corners: CornerRadii) => void;
+  /**
+   * Breaks one screen out to its own canvas size (null returns it to the
+   * set's shared artboard). The screen's layout rescales to follow, exactly
+   * as a document-level retarget would have moved it.
+   */
+  setScreenSize: (screenId: string, size: Artboard | null) => void;
   /** Restores a screen's layout to the template's defaults, keeping its copy and images. */
   resetScreen: (screenId: string) => void;
   setScreenBackground: (screenId: string, background: Background) => void;

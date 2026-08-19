@@ -210,6 +210,14 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * clients the document may hold a background they cannot parse.
    */
   8: (doc) => ({ ...doc, version: 9 }),
+
+  /**
+   * v9 → v10: a screen gains `corners` — per-corner rounding of the exported
+   * frame — and `size`, its own canvas dimensions when broken out of the
+   * set's shared artboard. The defaults (square corners, null size) are
+   * exactly what every v9 screen was, so this only stamps the version.
+   */
+  9: (doc) => ({ ...doc, version: 10 }),
 };
 
 /**

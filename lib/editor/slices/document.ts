@@ -157,6 +157,12 @@ export function createDocumentSlice(
   get: GetState,
 ): DocumentSlice {
   /** Layers a fresh screen would get, used by reset. */
+  // The canvas one screen actually lives on — its own size when broken out of
+  // the set, the shared artboard otherwise. Per-screen geometry (layer fitting,
+  // centring, resets) must use this, never `doc.artboard` directly.
+  const screenArtboard = (doc: EditorDoc, screen: Screen) =>
+    screen.size ?? doc.artboard;
+
   const templateSpec = (doc: EditorDoc) =>
     orientSpec(resolveDevice(doc.deviceId), doc.orientation);
 
@@ -236,7 +242,9 @@ export function createDocumentSlice(
           ...doc,
           artboard,
           screens: doc.screens.map((screen) =>
-            screen.pinned
+            // A screen broken out to its own size is not on the shared canvas,
+            // so a retarget of that canvas has nothing to say to it.
+            screen.pinned || screen.size
               ? screen
               : {
                   ...screen,
@@ -273,7 +281,7 @@ export function createDocumentSlice(
                     colorwayId:
                       spec.colorways.find((c) => c.id === layer.colorwayId)?.id ??
                       colorwayId,
-                    ...fitDeviceToArtboard(spec, doc.artboard),
+                    ...fitDeviceToArtboard(spec, screenArtboard(doc, screen)),
                   }
                 : layer,
             ),
@@ -294,7 +302,10 @@ export function createDocumentSlice(
             ...screen,
             layers: screen.layers.map((layer) =>
               isDeviceLayer(layer)
-                ? { ...layer, ...fitDeviceToArtboard(spec, doc.artboard) }
+                ? {
+                    ...layer,
+                    ...fitDeviceToArtboard(spec, screenArtboard(doc, screen)),
+                  }
                 : layer,
             ),
           })),
@@ -435,6 +446,35 @@ export function createDocumentSlice(
     setScreenPinned: (screenId, pinned) =>
       patchScreen(set, screenId, (screen) => ({ ...screen, pinned })),
 
+    setScreenCorners: (screenId, corners) =>
+      patchScreen(set, screenId, (screen) => ({ ...screen, corners })),
+
+    setScreenSize: (screenId, size) =>
+      patchDoc(set, (doc) => ({
+        ...doc,
+        screens: doc.screens.map((screen) => {
+          if (screen.id !== screenId) return screen;
+
+          const from = screen.size ?? doc.artboard;
+          const to = size ?? doc.artboard;
+          if (from.width === to.width && from.height === to.height) {
+            return { ...screen, size };
+          }
+
+          // The same treatment a document-level retarget gives a screen: the
+          // layout follows the canvas rather than being left adrift on it.
+          const ratio = {
+            x: to.width / from.width,
+            y: to.height / from.height,
+          };
+          return {
+            ...screen,
+            size,
+            layers: screen.layers.map((layer) => rescaleLayer(layer, ratio)),
+          };
+        }),
+      })),
+
     /**
      * Puts the layout back to the template's defaults without discarding content.
      *
@@ -446,30 +486,33 @@ export function createDocumentSlice(
       const doc = get().doc;
       const spec = templateSpec(doc);
 
-      patchScreen(set, screenId, (screen) => ({
-        ...screen,
-        layers: screen.layers.map((layer) => {
-          if (isDeviceLayer(layer)) {
-            return { ...layer, ...fitDeviceToArtboard(spec, doc.artboard) };
-          }
-          if (isTextLayer(layer)) {
-            const fresh = createTextLayer(layer.role, doc.artboard);
-            return {
-              ...layer,
-              x: fresh.x,
-              y: fresh.y,
-              width: fresh.width,
-              fontSize: fresh.fontSize,
-              rotation: 0,
-            };
-          }
-          const fresh = createImageLayer(doc.artboard, {
-            width: layer.width,
-            height: layer.height,
-          });
-          return { ...layer, x: fresh.x, y: fresh.y, rotation: 0 };
-        }),
-      }));
+      patchScreen(set, screenId, (screen) => {
+        const artboard = screenArtboard(doc, screen);
+        return {
+          ...screen,
+          layers: screen.layers.map((layer) => {
+            if (isDeviceLayer(layer)) {
+              return { ...layer, ...fitDeviceToArtboard(spec, artboard) };
+            }
+            if (isTextLayer(layer)) {
+              const fresh = createTextLayer(layer.role, artboard);
+              return {
+                ...layer,
+                x: fresh.x,
+                y: fresh.y,
+                width: fresh.width,
+                fontSize: fresh.fontSize,
+                rotation: 0,
+              };
+            }
+            const fresh = createImageLayer(artboard, {
+              width: layer.width,
+              height: layer.height,
+            });
+            return { ...layer, x: fresh.x, y: fresh.y, rotation: 0 };
+          }),
+        };
+      });
     },
 
     setScreenBackground: (screenId, background: Background) =>
@@ -497,23 +540,24 @@ export function createDocumentSlice(
       const screen = doc.screens.find((s) => s.id === screenId);
       if (!screen) return null;
 
+      const artboard = screenArtboard(doc, screen);
       let layer: ScreenLayer;
 
       if (kind === "device") {
         layer = createDeviceLayer(
           templateSpec(doc),
-          doc.artboard,
+          artboard,
           getTemplate(doc.templateId).colorwayId,
         );
       } else if (kind === "image") {
-        layer = createImageLayer(doc.artboard);
+        layer = createImageLayer(artboard);
       } else {
         // Whichever role is missing is almost certainly the one wanted; a screen
         // with a headline needs a subtitle next, not a second headline.
         const hasTitle = screen.layers.some(
           (l) => isTextLayer(l) && l.role === "title",
         );
-        layer = createTextLayer(hasTitle ? "body" : "title", doc.artboard);
+        layer = createTextLayer(hasTitle ? "body" : "title", artboard);
       }
 
       patchScreen(set, screenId, (current) => ({
@@ -616,13 +660,16 @@ export function createDocumentSlice(
     centerLayer: (screenId, layerId) => {
       const doc = get().doc;
       const spec = templateSpec(doc);
+      const screen = doc.screens.find((s) => s.id === screenId);
+      if (!screen) return;
+      const artboard = screenArtboard(doc, screen);
 
       patchLayer(set, screenId, layerId, (layer) => {
         const width = isDeviceLayer(layer)
           ? spec.body.width * layer.scale
           : layer.width;
 
-        return { ...layer, x: (doc.artboard.width - width) / 2 };
+        return { ...layer, x: (artboard.width - width) / 2 };
       });
     },
   };

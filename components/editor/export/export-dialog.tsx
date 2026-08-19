@@ -36,9 +36,10 @@ import {
 } from "@/lib/export/formats";
 import { buildZip, type ZipEntry } from "@/lib/export/zip";
 import {
-  selectCardScale,
   selectOpaqueFallback,
+  selectScreenArtboard,
   selectScreenImageUrls,
+  selectScreenScale,
 } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { screenLabel } from "@/schemas/editor";
@@ -78,7 +79,6 @@ function ExportDialogBody() {
 
   const artboard = useEditorStore((s) => s.doc.artboard);
   const screens = useEditorStore((s) => s.doc.screens);
-  const cardScale = useEditorStore(selectCardScale);
   const projectName = useEditorStore((s) => s.projectName);
 
   const [section, setSection] = useState<Section>("download");
@@ -123,18 +123,21 @@ function ExportDialogBody() {
         const stage = getStage(screen.id);
         if (!stage || cancelled) continue;
 
+        // A screen broken out to its own size previews (and exports) at it.
+        const screenArtboard = selectScreenArtboard(screen.id)(state);
+
         try {
           const blob = await exportStage(
             stage,
             {
               format: "jpeg",
-              scale: Math.min(1, PREVIEW_WIDTH / state.doc.artboard.width),
+              scale: Math.min(1, PREVIEW_WIDTH / screenArtboard.width),
               quality: 0.8,
               transparent: false,
             },
             {
-              fitScale: selectCardScale(state),
-              artboard: state.doc.artboard,
+              fitScale: selectScreenScale(screen.id)(state),
+              artboard: screenArtboard,
               imageUrls: selectScreenImageUrls(state, screen.id),
               opaqueFallback: selectOpaqueFallback(state, screen.id),
             },
@@ -156,7 +159,24 @@ function ExportDialogBody() {
   }, [section]);
 
   const webpAvailable = useMemo(() => supportsWebpExport(), []);
-  const dims = exportDimensions(artboard, scale);
+
+  // Screens may carry their own canvas size; every guard and label below has
+  // to hold for the whole selection, not just the shared artboard.
+  const effectiveArtboard = (screen: (typeof screens)[number]) =>
+    screen.size ?? artboard;
+  const chosenScreens = screens.filter((screen) => selected.includes(screen.id));
+  const guardScreens = chosenScreens.length > 0 ? chosenScreens : screens;
+  const scaleWithinLimits = (option: ExportScale) =>
+    guardScreens.every(
+      (screen) => exportDimensions(effectiveArtboard(screen), option).withinLimits,
+    );
+  const uniformSize = guardScreens.every(
+    (screen) =>
+      effectiveArtboard(screen).width === effectiveArtboard(guardScreens[0]).width &&
+      effectiveArtboard(screen).height === effectiveArtboard(guardScreens[0]).height,
+  );
+  // A document always has at least one screen, so guardScreens is never empty.
+  const dims = exportDimensions(effectiveArtboard(guardScreens[0]), scale);
   const formatLabel =
     EXPORT_FORMATS.find((f) => f.id === format)?.label ?? "PNG";
 
@@ -196,10 +216,11 @@ function ExportDialogBody() {
           stage,
           { format, scale, quality, transparent },
           {
-            fitScale: cardScale,
-            artboard,
+            fitScale: selectScreenScale(screen.id)(state),
+            artboard: selectScreenArtboard(screen.id)(state),
             imageUrls: selectScreenImageUrls(state, screen.id),
             opaqueFallback: selectOpaqueFallback(state, screen.id),
+            corners: screen.corners,
           },
         );
 
@@ -288,14 +309,14 @@ function ExportDialogBody() {
                               alt={`Preview of ${screenLabel(screen, index)}`}
                               className="w-full"
                               style={{
-                                aspectRatio: `${artboard.width} / ${artboard.height}`,
+                                aspectRatio: `${effectiveArtboard(screen).width} / ${effectiveArtboard(screen).height}`,
                               }}
                             />
                           ) : (
                             <div
                               className="grid w-full place-items-center text-muted-foreground"
                               style={{
-                                aspectRatio: `${artboard.width} / ${artboard.height}`,
+                                aspectRatio: `${effectiveArtboard(screen).width} / ${effectiveArtboard(screen).height}`,
                               }}
                             >
                               <Loader2 className="size-4 animate-spin" />
@@ -315,8 +336,8 @@ function ExportDialogBody() {
 
                 <footer className="flex items-center justify-between border-t px-6 py-4">
                   <p className="text-xs text-muted-foreground">
-                    {screens.length} {screens.length === 1 ? "screen" : "screens"} ·{" "}
-                    {artboard.width} × {artboard.height} px
+                    {screens.length} {screens.length === 1 ? "screen" : "screens"}
+                    {uniformSize && ` · ${artboard.width} × ${artboard.height} px`}
                   </p>
                   <Button onClick={() => setSection("download")}>
                     Continue to download
@@ -418,7 +439,9 @@ function ExportDialogBody() {
                       <div className="flex items-baseline justify-between">
                         <Label className="text-xs font-medium">Scale</Label>
                         <span className="text-[11px] text-muted-foreground">
-                          {dims.width} × {dims.height} px
+                          {uniformSize
+                            ? `${dims.width} × ${dims.height} px`
+                            : "sizes vary by screen"}
                         </span>
                       </div>
                       <ToggleGroup
@@ -429,17 +452,17 @@ function ExportDialogBody() {
                         className="w-full"
                       >
                         {EXPORT_SCALES.map((option) => {
-                          const optionDims = exportDimensions(artboard, option);
+                          const withinLimits = scaleWithinLimits(option);
                           return (
                             <ToggleGroupItem
                               key={option}
                               value={String(option)}
                               className="flex-1 text-xs"
-                              disabled={!optionDims.withinLimits}
+                              disabled={!withinLimits}
                               title={
-                                optionDims.withinLimits
-                                  ? `${optionDims.width} × ${optionDims.height}`
-                                  : `${optionDims.megapixels.toFixed(0)}MP exceeds what browsers can rasterise`
+                                withinLimits
+                                  ? `${option}× every selected screen`
+                                  : "A selected screen exceeds what browsers can rasterise at this scale"
                               }
                             >
                               {option}×
@@ -504,7 +527,9 @@ function ExportDialogBody() {
                     <Button
                       onClick={handleDownload}
                       disabled={
-                        isExporting || !dims.withinLimits || selected.length === 0
+                        isExporting ||
+                        !scaleWithinLimits(scale) ||
+                        selected.length === 0
                       }
                     >
                       {isExporting ? (

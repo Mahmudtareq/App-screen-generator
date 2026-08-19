@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ChevronDown,
+  Frame,
   Image as ImageIcon,
   Layers,
   Palette,
@@ -26,6 +27,7 @@ import { screenLabel } from "@/schemas/editor";
 
 import { ScreenActions } from "../screens/screen-actions";
 import { BackgroundPanel } from "./background-panel";
+import { ScreenShapePanel } from "./screen-shape-panel";
 import { LayerRow } from "./layer-row";
 
 /**
@@ -194,6 +196,16 @@ export function InspectorPanel({
             onToggle={toggleSection}
           >
             <BackgroundPanel screenId={screenId} />
+          </Section>
+
+          <Section
+            id="frame"
+            label="Screen frame"
+            icon={<Frame className="size-4" />}
+            open={open === "frame"}
+            onToggle={toggleSection}
+          >
+            <ScreenShapePanel screenId={screenId} />
           </Section>
         </div>
       </ScrollArea>

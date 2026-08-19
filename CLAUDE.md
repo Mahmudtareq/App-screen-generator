@@ -62,7 +62,10 @@ text layers are a discriminated union on `kind`, narrowed with `isDeviceLayer` /
 `isImageLayer` / `isTextLayer` from the schema — never hand-written `kind ===`
 chains. The background is *not* a layer: it is always behind everything and is
 the one thing the export pipeline hides on its own. Device model, orientation and
-artboard are document-level, because five frames of one listing have to agree.
+artboard are document-level, because five frames of one listing have to agree —
+though a screen may carry a `size` override that breaks it out of the shared
+canvas (null means "use `doc.artboard`"; per-screen geometry must always go
+through `screen.size ?? doc.artboard`, via `selectScreenArtboard`).
 A text layer's copy is an ordered array of styled *runs* for the same reason, and
 Konva cannot lay that out — [lib/canvas/rich-text.ts](lib/canvas/rich-text.ts) owns
 every wrap point and fragment position, and preview and export share it. Read

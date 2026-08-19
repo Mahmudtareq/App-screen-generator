@@ -7,6 +7,7 @@ import {
   isDeviceLayer,
   isImageLayer,
   isTextLayer,
+  type Artboard,
   type Screen,
   type ScreenLayer,
   type TextRole,
@@ -31,6 +32,23 @@ export function selectOrientedSpec(state: EditorState): DeviceSpec {
 export function selectScreen(screenId: string) {
   return (state: EditorState): Screen | undefined =>
     state.doc.screens.find((screen) => screen.id === screenId);
+}
+
+/**
+ * The canvas one screen actually renders at: its own `size` when it has been
+ * broken out of the set, the shared `doc.artboard` otherwise. Returns one of
+ * the two stored objects, never a fresh one — Zustand subscriptions compare
+ * with `Object.is`.
+ */
+export function selectScreenArtboard(screenId: string) {
+  return (state: EditorState): Artboard =>
+    selectScreen(screenId)(state)?.size ?? state.doc.artboard;
+}
+
+/** Fit-to-strip scale for one screen — each sizes to its own artboard. */
+export function selectScreenScale(screenId: string) {
+  return (state: EditorState): number =>
+    computeCardScale(state.stripHeight, selectScreenArtboard(screenId)(state));
 }
 
 export function selectLayerById(screenId: string, layerId: string) {

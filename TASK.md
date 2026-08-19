@@ -560,6 +560,37 @@ image layers use.
 
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
 
+### 23. Screen frame — per-corner rounding and size controls (doc v10) ✅
+**19 Aug 2026**
+
+Asked for: round the artboard frame itself (per-corner radii) and adjust its
+width/height, per screen, without touching anything else.
+
+1. **Doc v9 → v10**: `screenSchema` gains `corners`
+   ({topLeft,topRight,bottomRight,bottomLeft}, artboard px, default all-zero =
+   today's square frame). Stamp-only `MIGRATIONS[9]`.
+2. **`lib/canvas/artboard-clip.ts`** — one per-corner clip builder shared by
+   preview and export. The live canvas rounds each corner by
+   max(screen radius, card ring's cosmetic 12px); `exportStage` swaps that for
+   the document radii exactly (new `ExportContext.corners`), but only for
+   alpha formats — a JPEG would fill the cut with black, so it stays square.
+3. **New "Screen frame" inspector section** (`screen-shape-panel.tsx`):
+   quick rounding presets (0/32/64/120), four per-corner inputs, and per-screen
+   width/height inputs with a "Use project size" reset.
+4. **Per-screen size** (same v10): `screenSchema.size` is a nullable artboard
+   override — null means the set's shared `doc.artboard`. `setScreenSize`
+   rescales that screen's layout on change (the `rescaleLayer` treatment a
+   document retarget gives); `setArtboard` skips broken-out screens like it
+   skips pinned ones. `selectScreenArtboard`/`selectScreenScale` are the one
+   way to per-screen geometry now — the stage, background, full-bleed device,
+   strip card sizing (mixed widths, one strip height), export dialog
+   (per-screen dims/guards/previews) and thumbnail capture all went through
+   them. CLAUDE.md's rule 2 documents the override.
+5. New screens start square at the shared size; duplicates inherit their
+   source's corners and size.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
 ---
 
 ## Open

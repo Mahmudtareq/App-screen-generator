@@ -5,7 +5,11 @@ import { Image as KonvaImage, Layer, Rect } from "react-konva";
 
 import { useCanvasBitmap } from "@/hooks/use-canvas-image";
 import { BACKGROUND_LAYER_NAME } from "@/lib/canvas/layer-names";
-import { selectImageSource, selectScreen } from "@/lib/editor/selectors";
+import {
+  selectImageSource,
+  selectScreen,
+  selectScreenArtboard,
+} from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { backgroundAssetKey } from "@/lib/editor/types";
 
@@ -24,7 +28,7 @@ export function BackgroundLayer({
   clipFunc?: (ctx: Context) => void;
 }) {
   const background = useEditorStore((s) => selectScreen(screenId)(s)?.background);
-  const artboard = useEditorStore((s) => s.doc.artboard);
+  const artboard = useEditorStore(selectScreenArtboard(screenId));
 
   const imageUrl = useEditorStore((s) =>
     background?.type === "image"
