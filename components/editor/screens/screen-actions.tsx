@@ -74,7 +74,7 @@ export function ScreenActions({ screenId }: { screenId: string }) {
         <Copy className="size-4" />
       </Action>
 
-      <Action label="Export this screen" onClick={() => openExport(screenId)}>
+      <Action label="Preview & export" onClick={() => openExport(screenId)}>
         <Download className="size-4" />
       </Action>
 

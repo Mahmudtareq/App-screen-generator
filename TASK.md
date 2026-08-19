@@ -498,6 +498,34 @@ the dashboard" gap; duplicate still has no UI.
 
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
 
+### 21. Batch export — sectioned export dialog with Preview and ZIP download ✅
+**19 Aug 2026**
+
+Asked for: export was one screen at a time — rework the dialog into a sectioned
+modal (AppScreens-style sidebar) with **Preview** (all screens) and **Download**
+(pick screens, save the set as a ZIP). More sections come later.
+
+1. **`lib/export/zip.ts`** — dependency-free, store-only ZIP writer (local
+   headers + central directory + EOCD, CRC-32, UTF-8 names). Store, not
+   deflate: the entries are already-compressed PNG/JPG/WebP. Verified with
+   `unzip -t`.
+2. **`export-dialog.tsx` reworked**: sidebar with two sections. *Preview*
+   renders every screen through `exportStage` at ~280px (object URLs, revoked
+   on unmount). *Download* keeps the existing format/scale/quality/transparent
+   controls, adds a screen multi-select (all selected by default), and saves —
+   a single file directly when one screen is selected, otherwise
+   `<project>-screenshots.zip` with `NN-<screen-name>.<ext>` entries and
+   `Exporting n/m…` progress.
+3. **Memory stays bounded**: screens rasterise *sequentially*, one
+   full-resolution canvas at a time — this sidesteps the five-32MP-canvases
+   iPad failure PLAN.md's batch-export note warns about, without the Phase 3
+   server-side compositor. The per-scale dimension guard is unchanged.
+4. Dialog body mounts fresh per open (selection/previews reset without
+   effects); close is blocked mid-export.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean; ZIP output
+validated with `unzip -t` (CRCs OK, contents extract byte-exact).
+
 ---
 
 ## Open

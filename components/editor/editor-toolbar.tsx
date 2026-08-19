@@ -230,10 +230,10 @@ export function EditorToolbar({
         size="sm"
         className="h-8"
         disabled={!exportTarget}
-        onClick={() => exportTarget && openExport(exportTarget)}
+        onClick={() => exportTarget && openExport(exportTarget, "all")}
       >
         <Download className="size-4" />
-        Export
+        Preview & Export
       </Button>
     </div>
   );

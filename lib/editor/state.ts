@@ -129,6 +129,11 @@ export interface UiSlice {
   /** Which screen the export dialog is open for; null means closed. */
   exportScreenId: string | null;
   /**
+   * What the dialog pre-selects: the whole set (toolbar's Preview & Export) or
+   * just the screen it was opened from (a card's per-screen action).
+   */
+  exportScope: "single" | "all";
+  /**
    * The project's name, which is a `Project` column rather than part of the editor
    * document — so it lives here, in the un-partialized half of the store, and is
    * neither serialised into `doc` nor pushed onto the undo stack. Typing a title
@@ -145,7 +150,7 @@ export interface UiSlice {
   setProjectName: (name: string) => void;
 
   setExporting: (isExporting: boolean) => void;
-  openExport: (screenId: string) => void;
+  openExport: (screenId: string, scope?: "single" | "all") => void;
   closeExport: () => void;
 }
 
