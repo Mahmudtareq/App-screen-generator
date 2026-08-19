@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { NextResponse, type NextRequest } from "next/server";
 
+import { asyncHandler } from "@/lib/async-handler";
 import { CaptureError, captureProvider } from "@/lib/capture";
-import { getDevice } from "@/lib/devices/catalog";
+import { getDeviceSpecServer } from "@/lib/devices/custom";
 import { orientSpec } from "@/lib/devices/orientation";
+import { apiResponse } from "@/lib/server.utils";
 import { captureRequestSchema } from "@/schemas/capture";
 
 /**
@@ -62,57 +63,55 @@ function clientKey(request: Request): string {
   return forwarded?.split(",")[0]?.trim() || "unknown";
 }
 
-export async function POST(request: Request) {
-  if (rateLimited(clientKey(request))) {
-    return NextResponse.json(
-      { error: "Too many captures in a row. Wait a moment and try again." },
-      { status: 429 },
-    );
-  }
-
-  const parsed = captureRequestSchema.safeParse(
-    await request.json().catch(() => null),
-  );
-
-  if (!parsed.success) {
-    const issues = z.flattenError(parsed.error).fieldErrors;
-    return NextResponse.json(
-      { error: issues.url?.[0] ?? "That request was not valid." },
-      { status: 400 },
-    );
-  }
-
-  const { url, deviceId, orientation, fullPage } = parsed.data;
-
-  // Capture at the device's own CSS viewport so the page lays itself out as a
-  // phone. Using the device-pixel screenshot size here would render a desktop
-  // layout and then shrink it.
-  const spec = orientSpec(getDevice(deviceId), orientation);
-
-  try {
-    const result = await captureProvider.capture({
-      url,
-      width: spec.viewport.width,
-      height: spec.viewport.height,
-      scale: spec.viewport.scale,
-      fullPage,
-    });
-
-    return new NextResponse(result.bytes, {
-      headers: {
-        "Content-Type": result.contentType,
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (error) {
-    if (error instanceof CaptureError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+// Anonymous on purpose (auth level false); the rate limit above is the guard.
+// Unlike every other route, the success path returns raw image bytes rather
+// than the JSON envelope — see the header comment. Errors still use apiResponse.
+export const POST = asyncHandler(
+  captureRequestSchema,
+  async (req: NextRequest, data) => {
+    if (rateLimited(clientKey(req))) {
+      return apiResponse(
+        false,
+        429,
+        "Too many captures in a row. Wait a moment and try again.",
+      );
     }
 
-    console.error("[api/capture]", error);
-    return NextResponse.json(
-      { error: "The screenshot could not be taken. Please try again." },
-      { status: 500 },
-    );
-  }
-}
+    const { url, deviceId, orientation, fullPage } = data;
+
+    // Capture at the device's own CSS viewport so the page lays itself out as a
+    // phone. Using the device-pixel screenshot size here would render a desktop
+    // layout and then shrink it. Built-in ids resolve from the static catalog;
+    // admin-authored ones come from the database.
+    const resolved = await getDeviceSpecServer(deviceId);
+    if (!resolved) {
+      return apiResponse(false, 400, "That device is not available.");
+    }
+    const spec = orientSpec(resolved, orientation);
+
+    try {
+      const result = await captureProvider.capture({
+        url,
+        width: spec.viewport.width,
+        height: spec.viewport.height,
+        scale: spec.viewport.scale,
+        fullPage,
+      });
+
+      return new NextResponse(result.bytes, {
+        headers: {
+          "Content-Type": result.contentType,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      // The provider's status codes carry meaning (timeouts, blocked hosts) the
+      // wrapper's generic mapping would flatten to 500, so they are kept here.
+      if (error instanceof CaptureError) {
+        return apiResponse(false, error.status, error.message);
+      }
+      throw error;
+    }
+  },
+  false,
+);

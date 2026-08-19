@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { ARTBOARD_MAX, ARTBOARD_MIN } from "@/config/artboards";
 import { DEFAULT_FONT_ID } from "@/config/fonts";
-import { DEFAULT_TEMPLATE_ID, MAX_SCREENS, TEMPLATE_IDS } from "@/config/templates";
-import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
+import { DEFAULT_TEMPLATE_ID, MAX_SCREENS } from "@/config/templates";
+import { DEFAULT_DEVICE_ID } from "@/lib/devices/catalog";
 
 /**
  * The editor document — the single contract shared by the Zustand store, the
@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID, DEVICE_IDS } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 6;
+export const EDITOR_DOC_VERSION = 8;
 
 const hexColorSchema = z
   .string()
@@ -101,6 +101,12 @@ export const backgroundSchema = z.discriminatedUnion("type", [
 export const screenshotSchema = z.object({
   assetId: objectIdStringSchema.nullable().default(null),
   url: assetUrlSchema.nullable().default(null),
+  /**
+   * How the bitmap meets the screen rect. `cover` crops (the default, and the
+   * only mode zoom/pan mean anything in); `contain` letterboxes against the
+   * colorway's screen fill, for a capture whose aspect must not be cropped.
+   */
+  fit: z.enum(["cover", "contain"]).default("cover"),
   /** >= 1. Zooms into the cover-cropped region rather than scaling the node. */
   zoom: z.number().min(1).max(4).default(1),
   /** Each axis in -1..1, as a fraction of the crop slack. */
@@ -108,6 +114,23 @@ export const screenshotSchema = z.object({
     .object({ x: z.number().min(-1).max(1), y: z.number().min(-1).max(1) })
     .default({ x: 0, y: 0 }),
 });
+
+/**
+ * What the device layer actually draws.
+ *
+ * `device` is the framed mockup; `screenshot` hides the frame and shows the
+ * bare screenshot with the screen's rounded corners; `full` bleeds the
+ * screenshot across the whole artboard behind everything else and ignores the
+ * layer's own transform.
+ */
+export const frameModeSchema = z.enum(["device", "screenshot", "full"]);
+
+/**
+ * A stylised lean, faked with an affine skew — Konva has no perspective
+ * projection, so edges stay parallel rather than converging. Honest enough for
+ * a store frame; true 3D would need a WebGL pass.
+ */
+export const perspectiveSchema = z.enum(["none", "left", "right"]);
 
 /** Drop shadow, for captions sitting over a busy background image. */
 export const textShadowSchema = z.object({
@@ -158,6 +181,8 @@ export const deviceLayerSchema = z.object({
   ...layerBaseFields,
   kind: z.literal("device"),
   colorwayId: z.string().min(1),
+  frameMode: frameModeSchema.default("device"),
+  perspective: perspectiveSchema.default("none"),
   x: z.number(),
   y: z.number(),
   /** Uniform scale from device px into artboard px. */
@@ -314,9 +339,23 @@ export const screenSchema = z.object({
 
 export const editorDocSchema = z.object({
   version: z.number().int().min(1).default(EDITOR_DOC_VERSION),
-  /** Which template the project started from; kept so the picker can show it. */
-  templateId: z.enum(TEMPLATE_IDS).default(DEFAULT_TEMPLATE_ID),
-  deviceId: z.enum(DEVICE_IDS).default(DEFAULT_DEVICE_ID),
+  /**
+   * Which template the project started from; kept so the picker can show it.
+   *
+   * A free string rather than an enum of the built-in templates: templates can
+   * now be saved by users (`custom:<id>`), so a document may name one this
+   * build has never heard of. `getTemplate` falls back to the default recipe
+   * rather than throwing, so an unresolvable id costs the default styling for
+   * new layers, not a whole document.
+   */
+  templateId: z.string().min(1).max(64).default(DEFAULT_TEMPLATE_ID),
+  /**
+   * A free string rather than an enum of the built-in catalog: devices can now
+   * be authored in the admin panel, so a document may name one this build has
+   * never heard of. `resolveDevice` falls back to the default frame rather than
+   * throwing, so an unresolvable id costs a bezel, not a whole document.
+   */
+  deviceId: z.string().min(1).max(64).default(DEFAULT_DEVICE_ID),
   orientation: orientationSchema.default("portrait"),
   artboard: artboardSchema,
   screens: z.array(screenSchema).min(1).max(MAX_SCREENS),
@@ -337,6 +376,9 @@ export type Artboard = z.infer<typeof artboardSchema>;
 export type Background = z.infer<typeof backgroundSchema>;
 export type BackgroundType = Background["type"];
 export type ScreenshotState = z.infer<typeof screenshotSchema>;
+export type ScreenshotFit = ScreenshotState["fit"];
+export type FrameMode = z.infer<typeof frameModeSchema>;
+export type DevicePerspective = z.infer<typeof perspectiveSchema>;
 export type TextRole = TextLayer["role"];
 export type TextShadow = z.infer<typeof textShadowSchema>;
 export type TextBackground = z.infer<typeof textBackgroundSchema>;

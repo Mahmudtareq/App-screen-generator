@@ -1,7 +1,7 @@
 import { getTemplate, MAX_SCREENS } from "@/config/templates";
 import { nearestWeight, type CanvasFontId } from "@/config/fonts";
-import { getDevice } from "@/lib/devices/catalog";
 import { orientSpec } from "@/lib/devices/orientation";
+import { resolveDevice } from "@/lib/devices/registry";
 import {
   isDeviceLayer,
   isImageLayer,
@@ -158,7 +158,7 @@ export function createDocumentSlice(
 ): DocumentSlice {
   /** Layers a fresh screen would get, used by reset. */
   const templateSpec = (doc: EditorDoc) =>
-    orientSpec(getDevice(doc.deviceId), doc.orientation);
+    orientSpec(resolveDevice(doc.deviceId), doc.orientation);
 
   return {
     doc: createDocFromTemplate(),
@@ -181,7 +181,7 @@ export function createDocumentSlice(
 
         return {
           ...doc,
-          templateId: template.id as EditorDoc["templateId"],
+          templateId: template.id,
           screens: doc.screens.map((screen) => {
             if (screen.pinned) return screen;
 
@@ -211,6 +211,9 @@ export function createDocumentSlice(
           }),
         };
       }),
+
+    setTemplateId: (templateId) =>
+      patchDoc(set, (doc) => ({ ...doc, templateId })),
 
     /* ----------------------------- document level ---------------------------- */
 
@@ -254,7 +257,7 @@ export function createDocumentSlice(
       patchDoc(set, (doc) => {
         if (deviceId === doc.deviceId) return doc;
 
-        const spec = orientSpec(getDevice(deviceId), doc.orientation);
+        const spec = orientSpec(resolveDevice(deviceId), doc.orientation);
         const colorwayId = spec.colorways[0].id;
 
         return {
@@ -282,7 +285,7 @@ export function createDocumentSlice(
       patchDoc(set, (doc) => {
         if (orientation === doc.orientation) return doc;
 
-        const spec = orientSpec(getDevice(doc.deviceId), orientation);
+        const spec = orientSpec(resolveDevice(doc.deviceId), orientation);
 
         return {
           ...doc,

@@ -17,6 +17,12 @@ import type { EditorState } from "./state";
 import { backgroundAssetKey, layerAssetKey, type AssetKey } from "./types";
 
 export const DRAFT_KEY = "editor:draft:v1";
+/**
+ * A sibling key rather than a field inside the draft: the name is a `Project`
+ * column, not part of `EditorDoc`, and folding it into the draft would mean the
+ * stored draft no longer parses as the document schema it is read back through.
+ */
+export const DRAFT_NAME_KEY = "editor:draft-name:v1";
 
 /**
  * Migrations from older `doc.version` values, applied in order.
@@ -177,6 +183,24 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * picture.
    */
   5: (doc) => ({ ...doc, version: 6 }),
+
+  /**
+   * v6 → v7: `deviceId` widens from the built-in enum to any device id (admin
+   * devices), a device layer gains `frameMode` and `perspective`, and a
+   * screenshot gains `fit`. Every new field has a schema default that reproduces
+   * the old behaviour exactly — framed, upright, cover-cropped — so this only
+   * stamps the version.
+   */
+  6: (doc) => ({ ...doc, version: 7 }),
+
+  /**
+   * v7 → v8: `templateId` widens from the built-in enum to any template id
+   * (user-saved templates, `custom:<id>`). Every id a v7 document can hold is
+   * still valid, so this only stamps the version — the stamp tells a client
+   * running older code that the id may be unresolvable, rather than letting it
+   * fail the enum parse and drop the draft whole.
+   */
+  7: (doc) => ({ ...doc, version: 8 }),
 };
 
 /**
@@ -223,9 +247,26 @@ export function loadDraft(): EditorDoc | null {
   }
 }
 
+export function saveDraftName(name: string) {
+  try {
+    localStorage.setItem(DRAFT_NAME_KEY, name);
+  } catch {
+    // Same reasoning as saveDraft: an autosave is not worth an interruption.
+  }
+}
+
+export function loadDraftName(): string {
+  try {
+    return localStorage.getItem(DRAFT_NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function clearDraft() {
   try {
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(DRAFT_NAME_KEY);
   } catch {
     // Nothing useful to do.
   }

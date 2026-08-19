@@ -1,10 +1,14 @@
 "use client";
 
+import type { SessionUser } from "@/components/auth/user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { registerCustomDevices } from "@/lib/devices/registry";
+import type { DeviceSpec } from "@/lib/devices/types";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useProjectBootstrap } from "@/hooks/use-project-bootstrap";
 
 import { AppBar } from "./app-bar";
+import { ProjectTitle } from "./project-title";
 import { EditorToolbar } from "./editor-toolbar";
 import { ExportDialog } from "./export/export-dialog";
 import { ScreenStrip } from "./screens/screen-strip";
@@ -18,7 +22,10 @@ export interface EditorShellProps {
    * it through `migrateDoc` rather than trusting the declared type.
    */
   initialDoc?: unknown;
-  signedIn: boolean;
+  /** The signed-in user, or null when anonymous. Saving needs one; editing does not. */
+  user: SessionUser | null;
+  /** Admin-authored device specs, fetched by the server page. */
+  customDevices?: DeviceSpec[];
 }
 
 /**
@@ -33,27 +40,29 @@ export function EditorShell({
   projectId,
   projectName,
   initialDoc,
-  signedIn,
+  user,
+  customDevices,
 }: EditorShellProps) {
-  const ready = useProjectBootstrap(initialDoc);
+  // Registered during render, before any Stage mounts, so `resolveDevice` never
+  // has a frame where a document's device id is unknown. The registry is an
+  // idempotent module-level map (like the bitmap cache), so re-running under
+  // Strict Mode is harmless.
+  registerCustomDevices(customDevices ?? []);
+
+  const ready = useProjectBootstrap(initialDoc, projectName);
   useEditorShortcuts();
-  console.log("EditorShell render", {
-    projectId,
-    projectName,
-    initialDoc,
-    signedIn,
-    ready,
-  });
+
+  const signedIn = Boolean(user);
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppBar active="editor" projectName={projectName} signedIn={signedIn} />
-
-      <EditorToolbar
-        projectId={projectId}
-        projectName={projectName}
-        signedIn={signedIn}
+      <AppBar
+        active="editor"
+        title={<ProjectTitle projectId={projectId} />}
+        user={user}
       />
+
+      <EditorToolbar projectId={projectId} signedIn={signedIn} />
 
       {ready ? (
         <ScreenStrip />

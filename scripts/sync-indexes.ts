@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/db";
-import { Asset, Project, User } from "@/models";
+import { Asset, Device, Project, Template, User } from "@/models";
 
 /**
  * Builds the indexes declared on the models.
@@ -21,7 +21,7 @@ async function main() {
   await connectDB();
 
   const results = await Promise.all(
-    [User, Project, Asset].map(async (model) => {
+    [User, Project, Asset, Device, Template].map(async (model) => {
       await model.syncIndexes();
       const indexes = await model.collection.indexes();
       return `${model.modelName}: ${indexes.map((i) => i.name).join(", ")}`;

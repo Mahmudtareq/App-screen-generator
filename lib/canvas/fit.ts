@@ -2,6 +2,20 @@
 export const STRIP_PADDING = 24;
 
 /**
+ * Screen-px margin the Stage keeps around the artboard on each side, so selection
+ * chrome — anchors on an edge-hugging layer, the rotate handle above the box — has
+ * somewhere to draw instead of being cut off at the canvas edge. Vertical is the
+ * larger of the two because the rotate handle sits `rotateAnchorOffset` above the
+ * selection. Artwork never paints here: the background and content layers are
+ * clipped to the artboard, and export crops the gutter back out.
+ */
+export const CANVAS_GUTTER_X = 20;
+export const CANVAS_GUTTER_Y = 32;
+
+/** Corner rounding of the artboard preview, in screen px. Matches the card ring's `rounded-xl`. */
+export const ARTBOARD_CORNER_RADIUS = 12;
+
+/**
  * Scale factor that fits an artboard into the filmstrip's height.
  *
  * Height is the only constraint. Every screen in a project shares one artboard, so
@@ -21,7 +35,7 @@ export function computeCardScale(
   artboard: { width: number; height: number },
   padding = STRIP_PADDING,
 ): number {
-  const available = stripHeight - padding * 2;
+  const available = stripHeight - padding * 2 - CANVAS_GUTTER_Y * 2;
   if (available <= 0) return 0;
 
   return Math.min(available / artboard.height, 1);

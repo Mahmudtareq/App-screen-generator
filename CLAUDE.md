@@ -100,18 +100,36 @@ Konva's Transformer mutates `scaleX`/`scaleY` — always route `onTransformEnd`
 through `normalizeTransform` in [lib/canvas/transform.ts](lib/canvas/transform.ts),
 never inline in a component.
 
-**5. Every server action goes through `withAction`.** [lib/action.ts](lib/action.ts)
-(`server-only`, no `"use server"` — action files carry the directive) wraps auth
-guard, zod parse, `connectDB()` and error mapping into one `ActionResult<T>`
-envelope. Client Components narrow it via
-[lib/action-client.ts](lib/action-client.ts). Throw `raise(code, msg)` from a
-handler rather than returning ad-hoc shapes.
+**5. Every backend call flows UI → server action → `apiClient` → API route →
+database.** Components never call `fetch` against the API or touch models;
+actions (`actions/<domain>/<domain>Actions.ts`) are thin wrappers over
+[lib/api-client.ts](lib/api-client.ts), the one server-side fetch wrapper — it
+forwards the Auth.js session cookie, reads its base URL from
+`NEXT_PUBLIC_BASE_URL`, and signs out + redirects on 401.
+Every route handler under `app/api/` is wrapped:
+`export const GET = asyncHandler(handler, authLevel)` or
+`asyncHandler(schema, handler, authLevel)` with auth levels
+`false | true | "admin"` — never a bare `export async function GET`.
+[lib/async-handler.ts](lib/async-handler.ts) owns `connectDB()`, the session
+guard (attaching `req.user`), awaiting dynamic params, zod body parsing, and
+mapping every error onto the one envelope. Responses come only from
+`apiResponse(status, code, message, data)` in
+[lib/server.utils.ts](lib/server.utils.ts): `{ status, message, data }`, with
+validation failures carrying a `{ field: message }` map in `data`. List
+endpoints take `page`/`limit`/`search` and return `docs` plus the
+`PaginatedResult` fields (`makePaginate`); search input goes through
+`escapeRegex` before `$regex`.
 Ownership is always a filter clause — `Project.findOne({ _id, userId })`, never
-fetch-then-compare — and missing/foreign ids return `NOT_FOUND` so ids cannot be
-enumerated. `ctx.userId` comes from the session only; no action takes a `userId`
-parameter and no schema has a field for one.
-Every catch must re-throw Next control-flow errors first
-(`isNextControlFlowError`) — `redirect()` works by throwing.
+fetch-then-compare — and missing/foreign ids return 404 so ids cannot be
+enumerated. `req.user` comes from the session only; no route reads a userId from
+the query or body.
+Every catch must re-throw Next control-flow errors first (`rethrowIfRedirect`
+in [lib/redirect-guard.ts](lib/redirect-guard.ts)) — `redirect()` works by
+throwing. The two exceptions to the flow are deliberate:
+[app/api/cloudinary/sign/route.ts](app/api/cloudinary/sign/route.ts) is called
+by the browser directly (body-size and upload-progress reasons), and
+[app/api/capture/route.ts](app/api/capture/route.ts) returns raw image bytes on
+success (rule 3) while still using the envelope for errors.
 
 ### Auth and data layer
 
@@ -134,9 +152,13 @@ Every catch must re-throw Next control-flow errors first
   first paint. Rotated specs must stay memoised
   ([lib/devices/orientation.ts](lib/devices/orientation.ts)): returning a fresh
   object per call causes an infinite render loop under Zustand v5's `Object.is`.
-- Templates are static TypeScript too, in [config/templates.ts](config/templates.ts),
+- Built-in templates are static TypeScript in [config/templates.ts](config/templates.ts),
   and that file must only ever `import type` from `schemas/editor.ts` — the schema
-  imports `TEMPLATE_IDS` from it, so a value import would close a module cycle.
+  imports `DEFAULT_TEMPLATE_ID`/`MAX_SCREENS` from it, so a value import would
+  close a module cycle. User-saved templates are database rows
+  ([models/Template.ts](models/Template.ts)) holding a full `doc` snapshot; their
+  ids are namespaced `custom:<id>` and `doc.templateId` is a free string for
+  exactly that reason.
 
 ### Editor UI
 
@@ -170,6 +192,12 @@ Every catch must re-throw Next control-flow errors first
   holding one fails its own schema and silently drops the whole draft on reload.
 
 ### Current state
+
+[TASK.md](TASK.md) is the running task log — what has been built, in order, with the
+doc-version bump each task needed. **Keep it current**: add an entry when a task
+starts, and move it to Done with the date and the commit when it lands. It is the
+answer to "what changed and why" that neither the git log nor FEATURES.md gives on
+its own.
 
 [PLAN.md](PLAN.md) tracks phases and known risks. Two things to know:
 

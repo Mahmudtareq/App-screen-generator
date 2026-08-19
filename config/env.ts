@@ -35,6 +35,15 @@ const serverEnvSchema = z.object({
   // Optional. Without it, website capture uses Microlink's free endpoint, which
   // is rate limited per IP at roughly 50 requests a day.
   MICROLINK_API_KEY: z.string().min(1).optional(),
+
+  // Comma-separated emails allowed into the admin panel (device management).
+  // Optional: without it, no one is an admin and the panel 404s for everyone.
+  ADMIN_EMAILS: z.string().optional(),
+
+  // Base URL the server-side api-client uses to call this app's own API routes.
+  // Server actions run on the server, so a relative /api path has no origin to
+  // resolve against — the absolute URL has to be configured.
+  NEXT_PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
 });
 
 function parseEnv() {

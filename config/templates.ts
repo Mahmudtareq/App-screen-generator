@@ -4,15 +4,16 @@ import type { Background } from "@/schemas/editor";
  * Starter templates.
  *
  * Pure data, and deliberately free of any runtime import from `schemas/editor.ts`
- * — the schema imports `TEMPLATE_IDS` from here, so anything more than a
- * `import type` in this direction would close a module cycle. Turning these
- * definitions into a real document is `lib/editor/defaults.ts`'s job.
+ * — the schema imports `DEFAULT_TEMPLATE_ID` and `MAX_SCREENS` from here, so
+ * anything more than a `import type` in this direction would close a module
+ * cycle. Turning these definitions into a real document is
+ * `lib/editor/defaults.ts`'s job.
  *
  * Static TypeScript rather than a collection, for the same reason as the device
  * catalog: the editor needs a template synchronously to render its very first
- * frame, and keeping them here makes `TemplateId` a literal union. Promote to
- * MongoDB when non-engineers need to author them — the shape below is already
- * what such a document would hold.
+ * frame. These built-ins now live alongside user-saved templates
+ * (`models/Template.ts`), which store a full document snapshot instead of a
+ * styling recipe.
  */
 
 export interface TemplateScreenCopy {

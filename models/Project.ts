@@ -11,7 +11,7 @@ import type { EditorDoc } from "@/schemas/editor";
  * the design itself and the metadata the dashboard lists.
  *
  * The subdocument below is deliberately permissive: `schemas/editor.ts` is the
- * authority on shape, enforced by `withAction` before anything reaches Mongo.
+ * authority on shape, enforced by `asyncHandler` before anything reaches Mongo.
  * Duplicating those rules here would mean two definitions to keep in step, and
  * the stricter one would reject documents the editor considers valid.
  */

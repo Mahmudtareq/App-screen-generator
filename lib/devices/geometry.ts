@@ -104,3 +104,37 @@ export function resolveButtonRect(spec: DeviceSpec, button: SideButton): Rect {
 export function screenshotAspect(spec: DeviceSpec): number {
   return spec.screenshot.width / spec.screenshot.height;
 }
+
+/**
+ * Ratios people actually say out loud, checked long-side-first. 1320 × 2868
+ * reduces exactly to 110:239, which nobody recognises — "19.5:9" is the name of
+ * that shape, so a small tolerance maps near misses onto the familiar label.
+ */
+const FRIENDLY_RATIOS: readonly [number, number][] = [
+  [19.5, 9],
+  [20, 9],
+  [19.3, 9],
+  [21, 9],
+  [16, 9],
+  [16, 10],
+  [3, 2],
+  [4, 3],
+  [5, 4],
+  [1, 1],
+  [2, 1],
+];
+
+/** "19.5:9"-style label for a screenshot size, orientation-agnostic. */
+export function formatAspectRatio(width: number, height: number): string {
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  if (short <= 0) return "";
+
+  const ratio = long / short;
+
+  for (const [a, b] of FRIENDLY_RATIOS) {
+    if (Math.abs(a / b - ratio) / (a / b) < 0.02) return `${a}:${b}`;
+  }
+
+  return `${(Math.round(ratio * 100) / 100).toString()}:1`;
+}

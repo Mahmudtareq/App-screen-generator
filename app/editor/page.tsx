@@ -1,5 +1,6 @@
-import { auth } from "@/auth";
 import { EditorShell } from "@/components/editor/editor-shell";
+import { listEnabledDeviceSpecs } from "@/lib/devices/custom";
+import { getSessionUser } from "@/lib/session-user";
 
 export const metadata = {
   title: "Editor · Mockup Studio",
@@ -13,7 +14,10 @@ export const metadata = {
  * browser. Work is kept in a local draft until they choose to save it.
  */
 export default async function EditorPage() {
-  const session = await auth();
+  const [user, customDevices] = await Promise.all([
+    getSessionUser(),
+    listEnabledDeviceSpecs(),
+  ]);
 
-  return <EditorShell signedIn={Boolean(session?.user?.id)} />;
+  return <EditorShell user={user} customDevices={customDevices} />;
 }

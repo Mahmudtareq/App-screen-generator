@@ -6,6 +6,7 @@ export function createUiSlice(set: SetState): UiSlice {
     assets: {},
     isExporting: false,
     exportScreenId: null,
+    projectName: "",
 
     setAsset: (asset) =>
       set((state) => {
@@ -56,6 +57,8 @@ export function createUiSlice(set: SetState): UiSlice {
 
         return changed ? { assets: rest } : {};
       }),
+
+    setProjectName: (projectName) => set({ projectName }),
 
     setExporting: (isExporting) => set({ isExporting }),
     openExport: (exportScreenId) => set({ exportScreenId }),

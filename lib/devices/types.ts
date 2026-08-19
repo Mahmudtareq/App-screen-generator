@@ -100,11 +100,20 @@ export interface SideButton {
   radius: number;
 }
 
+/**
+ * Kept as unions rather than free strings so the picker's category tabs are a
+ * closed set the filters can switch over. Adding a brand means adding it here,
+ * to the admin form's options, and nowhere else.
+ */
+export type DeviceBrand = "apple" | "google" | "samsung" | "nothing" | "generic";
+
+export type DeviceCategory = "phone" | "tablet" | "watch" | "desktop";
+
 export interface DeviceSpec {
   id: string;
   name: string;
-  brand: "apple" | "google" | "samsung" | "generic";
-  category: "phone" | "tablet";
+  brand: DeviceBrand;
+  category: DeviceCategory;
   /** Native screenshot resolution, used to warn when an upload's aspect ratio will be cropped. */
   screenshot: { width: number; height: number };
   /**

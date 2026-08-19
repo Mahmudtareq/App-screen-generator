@@ -1,4 +1,3 @@
-import type { DeviceId } from "@/lib/devices/catalog";
 import type { Orientation } from "@/lib/devices/types";
 import type {
   Artboard,
@@ -30,14 +29,20 @@ export interface DocumentSlice {
   doc: EditorDoc;
 
   loadDoc: (doc: EditorDoc) => void;
-  /** Rebuilds the document from a template, discarding the current screens. */
+  /** Restyles every unpinned screen from a template, keeping ids, copy and images. */
   applyTemplate: (templateId: string) => void;
+  /**
+   * Records which template the document belongs to, without restyling anything.
+   * Written after "save as template" so the just-created template immediately
+   * becomes the one "Update template" targets.
+   */
+  setTemplateId: (templateId: string) => void;
 
   /* ------------------------------ document level ----------------------------- */
 
   /** Retargets the canvas, rescaling every unpinned screen's layout to match. */
   setArtboard: (artboard: Artboard) => void;
-  setDeviceId: (deviceId: DeviceId) => void;
+  setDeviceId: (deviceId: string) => void;
   setOrientation: (orientation: Orientation) => void;
   /**
    * Sets one text role's font on every unpinned screen at once.
@@ -123,12 +128,21 @@ export interface UiSlice {
   isExporting: boolean;
   /** Which screen the export dialog is open for; null means closed. */
   exportScreenId: string | null;
+  /**
+   * The project's name, which is a `Project` column rather than part of the editor
+   * document — so it lives here, in the un-partialized half of the store, and is
+   * neither serialised into `doc` nor pushed onto the undo stack. Typing a title
+   * should not be something Cmd+Z walks back through.
+   */
+  projectName: string;
 
   setAsset: (asset: EditorAsset) => void;
   updateAsset: (key: AssetKey, patch: Partial<EditorAsset>) => void;
   clearAsset: (key: AssetKey) => void;
   /** Releases every object URL belonging to a screen, when that screen is deleted. */
   clearScreenAssets: (screenId: string) => void;
+
+  setProjectName: (name: string) => void;
 
   setExporting: (isExporting: boolean) => void;
   openExport: (screenId: string) => void;
