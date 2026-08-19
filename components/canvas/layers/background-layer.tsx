@@ -1,5 +1,6 @@
 "use client";
 
+import type { Context } from "konva/lib/Context";
 import { Layer, Rect } from "react-konva";
 
 import { useCanvasBitmap } from "@/hooks/use-canvas-image";
@@ -16,7 +17,13 @@ import { backgroundAssetKey } from "@/lib/editor/types";
  *
  * Also the layer the export pipeline hides to produce a transparent PNG.
  */
-export function BackgroundLayer({ screenId }: { screenId: string }) {
+export function BackgroundLayer({
+  screenId,
+  clipFunc,
+}: {
+  screenId: string;
+  clipFunc?: (ctx: Context) => void;
+}) {
   const background = useEditorStore((s) => selectScreen(screenId)(s)?.background);
   const artboard = useEditorStore((s) => s.doc.artboard);
 
@@ -28,7 +35,9 @@ export function BackgroundLayer({ screenId }: { screenId: string }) {
   const bitmap = useCanvasBitmap(imageUrl);
 
   if (!background || background.type === "transparent") {
-    return <Layer name={BACKGROUND_LAYER_NAME} listening={false} />;
+    return (
+      <Layer name={BACKGROUND_LAYER_NAME} listening={false} clipFunc={clipFunc} />
+    );
   }
 
   const common = {
@@ -39,7 +48,7 @@ export function BackgroundLayer({ screenId }: { screenId: string }) {
   };
 
   return (
-    <Layer name={BACKGROUND_LAYER_NAME} listening={false}>
+    <Layer name={BACKGROUND_LAYER_NAME} listening={false} clipFunc={clipFunc}>
       {background.type === "color" && <Rect {...common} fill={background.color} />}
 
       {background.type === "gradient" && (

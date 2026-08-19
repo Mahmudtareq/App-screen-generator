@@ -367,6 +367,60 @@ real v7 doc, list+search, get, rename, empty-PATCH 400, duplicate, foreign-id
 404, delete), dashboard page rendering through the full
 action → apiClient → route chain, and the enveloped Cloudinary signature.
 
+### 16. Selection-handle restyle ✅
+**19 Aug 2026**
+
+Asked for: the selection chrome (thick solid-blue Konva defaults) looked clunky
+next to reference editors — restyle the move/resize/rotate handles to be subtle
+and friendly, changing nothing about how they behave.
+
+1. All styling lives in `components/canvas/controls/selection-transformer.tsx` —
+   the border rectangle and the rotate connector line are one Konva `back` shape
+   stroked with the border props, so restyling the border restyles both.
+2. Border (and rotate stalk) is now a thin dashed translucent-white line;
+   anchors are white circles with a light grey ring and a soft drop shadow
+   (`anchorStyleFunc` — Konva exposes anchor shadows only through that hook),
+   so they read on light and dark artwork alike. All dimensions still scale by
+   `1 / cardScale` to stay constant on screen.
+3. No behavioural change: per-kind anchor sets, `keepRatio` for devices, the
+   degenerate-box `boundBoxFunc` guard, offsets and padding are untouched.
+   No doc shape change, `EDITOR_DOC_VERSION` untouched.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
+### 17. Selection-chrome gutter — handles no longer clip at the card edge ✅
+**19 Aug 2026**
+
+Asked for: handles sometimes fell outside the visible card (rotate handle above
+a top-hugging layer, corner anchors on an edge-flush layer) and were cut off,
+making them unreachable; plus another usability/colour pass on the controls.
+
+1. **Every Stage now carries a gutter around the artboard**
+   (`CANVAS_GUTTER_X`/`CANVAS_GUTTER_Y` in `lib/canvas/fit.ts`, 20/32 screen px)
+   — selection chrome draws there instead of being clipped at the canvas edge.
+   `computeCardScale` reserves the vertical gutter so cards still fit the strip.
+2. **Artwork never paints into the gutter**: background and content layers are
+   clipped to a rounded artboard rect (`clipFunc` built in `canvas-stage.tsx`,
+   radius matches the ring's `rounded-xl`). The card's ring is now an inset
+   overlay div (`screen-card.tsx`) since the canvas extends past it; the pinned
+   badge and label row are inset/pulled up to keep the old look, with the label
+   row `pointer-events-none` so it cannot sit on top of bottom handles.
+3. **Export is unchanged in output**: `exportStage` clears the layer clips for
+   the render (they would bake transparent rounded corners) and crops the
+   gutter back out via `toBlob({ x, y, width, height })` — still exactly
+   `artboard × scale` px.
+4. **Controls**: kept the small 6px dots and corner-only anchors, but each
+   anchor now has an invisible ~18px grab target (`hitFunc` in
+   `anchorStyleFunc`), and the dashed white border + rotate stalk got a faint
+   drop shadow (styled on the Transformer's internal `back` shape) so it stays
+   legible over light artwork.
+
+Known limit: a layer dragged far outside the artboard can still push its
+handles past the gutter; the gutter covers the common edge-hugging cases.
+No doc shape change, `EDITOR_DOC_VERSION` untouched.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
 ---
 
 ## Open

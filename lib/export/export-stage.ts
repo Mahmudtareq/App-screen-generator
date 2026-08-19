@@ -1,9 +1,11 @@
 import type Konva from "konva";
 
+import { CANVAS_GUTTER_X, CANVAS_GUTTER_Y } from "@/lib/canvas/fit";
 import { ensureFontsLoaded } from "@/lib/canvas/fonts";
 import { whenAllSettled } from "@/lib/canvas/image-cache";
 import {
   BACKGROUND_LAYER_NAME,
+  CONTENT_LAYER_NAME,
   OVERLAY_LAYER_NAME,
 } from "@/lib/canvas/layer-names";
 import {
@@ -52,16 +54,31 @@ export async function exportStage(
 ): Promise<Blob> {
   const overlay = findLayer(stage, OVERLAY_LAYER_NAME);
   const background = findLayer(stage, BACKGROUND_LAYER_NAME);
+  const content = findLayer(stage, CONTENT_LAYER_NAME);
 
   const keepAlpha = options.transparent && SUPPORTS_ALPHA[options.format];
 
   let backdrop: Konva.Rect | undefined;
+
+  // On screen the artwork layers are clipped to a rounded artboard rect (the
+  // Stage carries a gutter for selection chrome). The crop below covers exactly
+  // the artboard, so the clip must come off for the render or the preview's
+  // rounded corners would export as transparent pixels.
+  const clippedLayers = [background, content].filter(
+    (layer): layer is Konva.Layer => Boolean(layer),
+  );
+  // The getter's type carries an extra `shape` parameter the config type lacks;
+  // the runtime value is the same function that was set via the config.
+  const savedClips = clippedLayers.map(
+    (layer) => layer.clipFunc() as unknown as Konva.LayerConfig["clipFunc"],
+  );
 
   try {
     // Selection handles baked into the export is the single most obvious way for
     // this to look broken.
     overlay?.visible(false);
     if (keepAlpha) background?.visible(false);
+    clippedLayers.forEach((layer) => layer.setAttrs({ clipFunc: undefined }));
 
     if (!SUPPORTS_ALPHA[options.format] && background) {
       // JPEG cannot store alpha, and an encoder handed a transparent canvas
@@ -95,6 +112,12 @@ export async function exportStage(
       mimeType: MIME[options.format],
       quality: SUPPORTS_QUALITY[options.format] ? options.quality : undefined,
       pixelRatio,
+      // Crop the selection-chrome gutter back out, so the output is exactly the
+      // artboard at `artboard × scale` px.
+      x: CANVAS_GUTTER_X,
+      y: CANVAS_GUTTER_Y,
+      width: context.artboard.width * context.fitScale,
+      height: context.artboard.height * context.fitScale,
     });
 
     if (!(blob instanceof Blob)) {
@@ -111,6 +134,9 @@ export async function exportStage(
     backdrop?.destroy();
     overlay?.visible(true);
     background?.visible(true);
+    clippedLayers.forEach((layer, i) =>
+      layer.setAttrs({ clipFunc: savedClips[i] }),
+    );
     stage.batchDraw();
   }
 }

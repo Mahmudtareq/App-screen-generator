@@ -1,5 +1,6 @@
 "use client";
 
+import type { Context } from "konva/lib/Context";
 import { Layer } from "react-konva";
 import { useShallow } from "zustand/react/shallow";
 
@@ -21,7 +22,13 @@ import { TextNode } from "../nodes/text-node";
  * it decides which component to mount, and reading it inside the node would mean a
  * second subscription per layer.
  */
-export function ContentLayer({ screenId }: { screenId: string }) {
+export function ContentLayer({
+  screenId,
+  clipFunc,
+}: {
+  screenId: string;
+  clipFunc?: (ctx: Context) => void;
+}) {
   const entries = useEditorStore(
     useShallow((s) => {
       const screen = selectScreen(screenId)(s);
@@ -32,7 +39,7 @@ export function ContentLayer({ screenId }: { screenId: string }) {
   );
 
   return (
-    <Layer name={CONTENT_LAYER_NAME}>
+    <Layer name={CONTENT_LAYER_NAME} clipFunc={clipFunc}>
       {entries.map((entry) => {
         const separator = entry.indexOf(":");
         const kind = entry.slice(0, separator) as LayerKind;

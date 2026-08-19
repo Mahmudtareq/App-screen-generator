@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type Konva from "konva";
+import type { Context } from "konva/lib/Context";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Stage } from "react-konva";
 
+import {
+  ARTBOARD_CORNER_RADIUS,
+  CANVAS_GUTTER_X,
+  CANVAS_GUTTER_Y,
+} from "@/lib/canvas/fit";
 import { setStage } from "@/lib/canvas/stage-registry";
 import { selectCardScale } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
@@ -38,6 +44,26 @@ export default function CanvasStage({ screenId }: { screenId: string }) {
     return () => setStage(screenId, null);
   }, [screenId]);
 
+  // Artwork is clipped to the artboard (with the ring's corner rounding) so
+  // nothing paints into the gutter — that margin belongs to the selection chrome
+  // alone. Export clears this clip and crops the gutter away instead.
+  const clipArtboard = useMemo(() => {
+    const { width, height } = artboard;
+    const radius = Math.min(
+      cardScale > 0 ? ARTBOARD_CORNER_RADIUS / cardScale : 0,
+      width / 2,
+      height / 2,
+    );
+    return (ctx: Context) => {
+      ctx.moveTo(radius, 0);
+      ctx.arcTo(width, 0, width, height, radius);
+      ctx.arcTo(width, height, 0, height, radius);
+      ctx.arcTo(0, height, 0, 0, radius);
+      ctx.arcTo(0, 0, width, 0, radius);
+      ctx.closePath();
+    };
+  }, [artboard, cardScale]);
+
   if (cardScale <= 0) return null;
 
   const handleBackdropPointerDown = (
@@ -53,15 +79,17 @@ export default function CanvasStage({ screenId }: { screenId: string }) {
   return (
     <Stage
       ref={ref}
-      width={artboard.width * cardScale}
-      height={artboard.height * cardScale}
+      width={artboard.width * cardScale + CANVAS_GUTTER_X * 2}
+      height={artboard.height * cardScale + CANVAS_GUTTER_Y * 2}
+      x={CANVAS_GUTTER_X}
+      y={CANVAS_GUTTER_Y}
       scaleX={cardScale}
       scaleY={cardScale}
       onMouseDown={handleBackdropPointerDown}
       onTouchStart={handleBackdropPointerDown}
     >
-      <BackgroundLayer screenId={screenId} />
-      <ContentLayer screenId={screenId} />
+      <BackgroundLayer screenId={screenId} clipFunc={clipArtboard} />
+      <ContentLayer screenId={screenId} clipFunc={clipArtboard} />
       <OverlayLayer screenId={screenId} cardScale={cardScale} />
     </Stage>
   );

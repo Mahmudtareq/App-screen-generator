@@ -6,7 +6,11 @@ import { useShallow } from "zustand/react/shallow";
 import { useCanvasFonts } from "@/components/canvas/canvas-host";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAX_SCREENS } from "@/config/templates";
-import { STRIP_PADDING } from "@/lib/canvas/fit";
+import {
+  CANVAS_GUTTER_X,
+  CANVAS_GUTTER_Y,
+  STRIP_PADDING,
+} from "@/lib/canvas/fit";
 import { useElementSize } from "@/hooks/use-element-size";
 import { selectCardScale } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
@@ -45,8 +49,10 @@ export function ScreenStrip() {
 
   const ref = useElementSize<HTMLDivElement>(({ height }) => setStripHeight(height));
 
-  const cardWidth = artboard.width * cardScale;
-  const cardHeight = artboard.height * cardScale;
+  // Cards are the artboard plus the Stage's selection-chrome gutter on each side;
+  // the gutter is visually empty, so the flex gap stays small to compensate.
+  const cardWidth = artboard.width * cardScale + CANVAS_GUTTER_X * 2;
+  const cardHeight = artboard.height * cardScale + CANVAS_GUTTER_Y * 2;
 
   const panelWidth = Math.round(
     Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, cardWidth * PANEL_WIDTH_RATIO)),
@@ -63,18 +69,25 @@ export function ScreenStrip() {
       className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-muted/40"
     >
       <div
-        className="flex h-full items-center gap-3"
+        className="flex h-full items-center gap-1"
         style={{ padding: STRIP_PADDING }}
       >
         {!ready
           ? // Placeholders at the real card size, so the strip does not reflow the
-            // moment the fonts resolve.
+            // moment the fonts resolve. The skeleton is inset to the artwork rect
+            // so it matches what the canvas will occupy.
             screenIds.map((id) => (
-              <Skeleton
+              <div
                 key={id}
-                className="shrink-0 rounded-xl"
-                style={{ width: cardWidth || 220, height: cardHeight || 460 }}
-              />
+                className="shrink-0"
+                style={{
+                  width: cardWidth || 220,
+                  height: cardHeight || 460,
+                  padding: `${CANVAS_GUTTER_Y}px ${CANVAS_GUTTER_X}px`,
+                }}
+              >
+                <Skeleton className="size-full rounded-xl" />
+              </div>
             ))
           : screenIds.map((id, index) => (
               <ScreenStripItem
@@ -89,18 +102,26 @@ export function ScreenStrip() {
             ))}
 
         {screenIds.length < MAX_SCREENS && (
-          <button
-            type="button"
-            className="flex shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent/40 hover:text-foreground"
-            style={{ width: cardWidth || 220, height: cardHeight || 460 }}
-            onClick={() => {
-              const id = addScreen(screenIds[screenIds.length - 1]);
-              if (id) selectScreen(id);
+          <div
+            className="shrink-0"
+            style={{
+              width: cardWidth || 220,
+              height: cardHeight || 460,
+              padding: `${CANVAS_GUTTER_Y}px ${CANVAS_GUTTER_X}px`,
             }}
           >
-            <Plus className="size-6" />
-            <span className="text-xs font-medium">Add screen</span>
-          </button>
+            <button
+              type="button"
+              className="flex size-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent/40 hover:text-foreground"
+              onClick={() => {
+                const id = addScreen(screenIds[screenIds.length - 1]);
+                if (id) selectScreen(id);
+              }}
+            >
+              <Plus className="size-6" />
+              <span className="text-xs font-medium">Add screen</span>
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -143,7 +164,9 @@ function ScreenStripItem({
           screenId={screenId}
           index={index}
           width={panelWidth}
-          height={cardHeight}
+          // The card's height includes the Stage gutter; the panel lines up with
+          // the artboard itself (the row is items-center, so it stays centred).
+          height={cardHeight - CANVAS_GUTTER_Y * 2}
         />
       )}
     </>
