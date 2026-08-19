@@ -591,6 +591,22 @@ width/height, per screen, without touching anything else.
 
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
 
+### 24. PROJECT-DOCUMENTATION.md — client-facing living documentation ✅
+**19 Aug 2026**
+
+Asked for: a single readable document covering every *implemented* feature —
+overview, feature index with work types and statuses, per-feature sections,
+workflows (incl. save-project vs save-as-template vs update-template), template
+system, project lifecycle, editor, auth, API and database overviews, lists,
+file handling, integrations, validation — maintained as a living document.
+
+Written from the codebase (FEATURES.md statuses, TASK.md history, and this
+session's exploration); every referenced file path verified to exist; honest
+partial statuses kept (duplicate-project API without UI, unused Asset records,
+draft device fidelity, dashboard search API without a search box). CLAUDE.md's
+"Current state" section now requires updating it alongside any feature change.
+Change History dates come from this log, not invention.
+
 ---
 
 ## Open
