@@ -1,7 +1,9 @@
 import type Konva from "konva";
 
+import { artboardClipFunc, hasRoundedCorners } from "@/lib/canvas/artboard-clip";
 import { CANVAS_GUTTER_X, CANVAS_GUTTER_Y } from "@/lib/canvas/fit";
 import { ensureFontsLoaded } from "@/lib/canvas/fonts";
+import type { CornerRadii } from "@/schemas/editor";
 import { whenAllSettled } from "@/lib/canvas/image-cache";
 import {
   BACKGROUND_LAYER_NAME,
@@ -36,6 +38,12 @@ export interface ExportContext {
   imageUrls: readonly (string | null | undefined)[];
   /** Fill painted under everything for formats that cannot store alpha. */
   opaqueFallback?: string;
+  /**
+   * The screen's own frame rounding, kept in the render as transparency —
+   * alpha formats only; a JPEG would fill the cut corners with black, so it
+   * stays square there.
+   */
+  corners?: CornerRadii;
 }
 
 function findLayer(stage: Konva.Stage, name: string): Konva.Layer | undefined {
@@ -65,9 +73,18 @@ export async function exportStage(
   let backdrop: Konva.Rect | undefined;
 
   // On screen the artwork layers are clipped to a rounded artboard rect (the
-  // Stage carries a gutter for selection chrome). The crop below covers exactly
-  // the artboard, so the clip must come off for the render or the preview's
-  // rounded corners would export as transparent pixels.
+  // Stage carries a gutter for selection chrome, and the cards get a cosmetic
+  // corner rounding). The crop below covers exactly the artboard, so that clip
+  // must not leak into the render: it is either removed — the preview's
+  // cosmetic rounding is not content — or, when the screen's own corners are
+  // rounded and the format can store alpha, replaced with the document radii
+  // exactly.
+  const roundedClip =
+    context.corners &&
+    hasRoundedCorners(context.corners) &&
+    SUPPORTS_ALPHA[options.format]
+      ? artboardClipFunc(context.artboard, context.corners)
+      : undefined;
   const clippedLayers = [background, content].filter(
     (layer): layer is Konva.Layer => Boolean(layer),
   );
@@ -82,7 +99,7 @@ export async function exportStage(
     // this to look broken.
     overlay?.visible(false);
     if (keepAlpha) background?.visible(false);
-    clippedLayers.forEach((layer) => layer.setAttrs({ clipFunc: undefined }));
+    clippedLayers.forEach((layer) => layer.setAttrs({ clipFunc: roundedClip }));
 
     if (!SUPPORTS_ALPHA[options.format] && background) {
       // JPEG cannot store alpha, and an encoder handed a transparent canvas

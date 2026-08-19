@@ -834,9 +834,9 @@ transparent or is it broken" is the one question a picker must never leave open.
 
 - Three sources. A stock-photo search (behind an API key) is the obvious next entry.
 - No multi-select — one pick fills one layer.
-- The picker is only wired to image layers. The background panel and the device
-  screenshot still have their own dropzone, and would each be one `assetKey` away
-  from using it.
+- The picker is wired to image layers and (since doc v9) the background panel's
+  "Select background". The device screenshot still has its own dropzone, one
+  `assetKey` away from joining them.
 - "Your images" is scoped to the open project; there is no account-wide library
   (that needs [H2](#h2-asset-records)).
 - Library ink is chosen at pick time and baked into the PNG; changing it afterwards

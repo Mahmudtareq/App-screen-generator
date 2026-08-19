@@ -13,6 +13,7 @@ import {
   selectImageSource,
   selectLayerById,
   selectOrientedSpec,
+  selectScreenArtboard,
 } from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { layerAssetKey } from "@/lib/editor/types";
@@ -69,6 +70,7 @@ export function DeviceNode({
   if (layer.frameMode === "full") {
     return (
       <FullBleedDevice
+        screenId={screenId}
         layer={layer}
         url={screenshotSrc}
         screenFill={colorway.style.screenFill}
@@ -169,17 +171,21 @@ export function DeviceNode({
  * (see selection-transformer.tsx).
  */
 function FullBleedDevice({
+  screenId,
   layer,
   url,
   screenFill,
   onSelect,
 }: {
+  screenId: string;
   layer: DeviceLayer;
   url: string | null;
   screenFill: string;
   onSelect: () => void;
 }) {
-  const artboard = useEditorStore((s) => s.doc.artboard);
+  // The screen's own canvas, not the shared artboard — full-bleed means this
+  // frame's edges, wherever this screen's size puts them.
+  const artboard = useEditorStore(selectScreenArtboard(screenId));
 
   const rect = useMemo(
     () => ({ x: 0, y: 0, width: artboard.width, height: artboard.height }),

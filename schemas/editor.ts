@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 8;
+export const EDITOR_DOC_VERSION = 10;
 
 const hexColorSchema = z
   .string()
@@ -87,15 +87,49 @@ export const backgroundSchema = z.discriminatedUnion("type", [
     angle: z.number().min(0).max(360),
     stops: z.array(gradientStopSchema).min(2).max(8),
   }),
+  /**
+   * Radial: painted from the artboard's centre outward. Stops run centre →
+   * edge; their offsets are fractions of the half-diagonal, so offset 1 lands
+   * exactly in the corners.
+   */
+  z.object({
+    type: z.literal("radial"),
+    stops: z.array(gradientStopSchema).min(2).max(8),
+  }),
   z.object({
     type: z.literal("image"),
     assetId: objectIdStringSchema.nullable().default(null),
     url: assetUrlSchema.nullable().default(null),
     fit: z.enum(["cover", "contain"]).default("cover"),
+    /** Which band survives a cover crop (or where a contained image sits). */
+    align: z.enum(["top", "center", "bottom"]).default("center"),
+    /** Quarter turns only — arbitrary angles leave wedges of nothing behind. */
+    rotation: z
+      .union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)])
+      .default(0),
     blur: z.number().min(0).max(100).default(0),
     opacity: z.number().min(0).max(1).default(1),
   }),
 ]);
+
+export const ZERO_CORNERS = {
+  topLeft: 0,
+  topRight: 0,
+  bottomRight: 0,
+  bottomLeft: 0,
+} as const;
+
+/** Per-corner rounding of a screen's exported frame, in artboard px. */
+export const cornerRadiiSchema = z
+  .object({
+    topLeft: z.number().min(0).max(2048).default(0),
+    topRight: z.number().min(0).max(2048).default(0),
+    bottomRight: z.number().min(0).max(2048).default(0),
+    bottomLeft: z.number().min(0).max(2048).default(0),
+  })
+  .default(ZERO_CORNERS);
+
+export type CornerRadii = z.infer<typeof cornerRadiiSchema>;
 
 /** The screenshot shown inside a device layer's screen cut-out. */
 export const screenshotSchema = z.object({
@@ -333,6 +367,19 @@ export const screenSchema = z.object({
    */
   pinned: z.boolean().default(false),
   background: backgroundSchema,
+  /**
+   * Rounding of the exported frame itself, per corner, in artboard px. Zero —
+   * the default — is a square corner and today's behaviour; anything more is
+   * clipped out of the artwork and exports as transparency (alpha formats
+   * only, since a JPEG would fill the cut with black).
+   */
+  corners: cornerRadiiSchema,
+  /**
+   * This screen's own canvas size, when it differs from the set's. Null — the
+   * default — means "use `doc.artboard`", which keeps a store set behaving as
+   * a set unless a frame is deliberately broken out.
+   */
+  size: artboardSchema.nullable().default(null),
   /** Index 0 paints first and sits at the back. */
   layers: z.array(screenLayerSchema).max(24).default([]),
 });

@@ -1,12 +1,15 @@
 "use client";
 
 import type { Context } from "konva/lib/Context";
-import { Layer, Rect } from "react-konva";
+import { Image as KonvaImage, Layer, Rect } from "react-konva";
 
 import { useCanvasBitmap } from "@/hooks/use-canvas-image";
-import { coverCrop } from "@/lib/canvas/cover";
 import { BACKGROUND_LAYER_NAME } from "@/lib/canvas/layer-names";
-import { selectImageSource, selectScreen } from "@/lib/editor/selectors";
+import {
+  selectImageSource,
+  selectScreen,
+  selectScreenArtboard,
+} from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 import { backgroundAssetKey } from "@/lib/editor/types";
 
@@ -25,7 +28,7 @@ export function BackgroundLayer({
   clipFunc?: (ctx: Context) => void;
 }) {
   const background = useEditorStore((s) => selectScreen(screenId)(s)?.background);
-  const artboard = useEditorStore((s) => s.doc.artboard);
+  const artboard = useEditorStore(selectScreenArtboard(screenId));
 
   const imageUrl = useEditorStore((s) =>
     background?.type === "image"
@@ -63,13 +66,41 @@ export function BackgroundLayer({
         />
       )}
 
-      {background.type === "image" && bitmap && (
+      {background.type === "radial" && (
         <Rect
           {...common}
+          fillRadialGradientStartPoint={{
+            x: artboard.width / 2,
+            y: artboard.height / 2,
+          }}
+          fillRadialGradientEndPoint={{
+            x: artboard.width / 2,
+            y: artboard.height / 2,
+          }}
+          fillRadialGradientStartRadius={0}
+          // Half the diagonal, so offset 1 reaches the corners rather than
+          // leaving them past the gradient's edge.
+          fillRadialGradientEndRadius={
+            Math.hypot(artboard.width, artboard.height) / 2
+          }
+          fillRadialGradientColorStops={background.stops.flatMap((stop) => [
+            stop.offset,
+            stop.color,
+          ])}
+        />
+      )}
+
+      {background.type === "image" && bitmap && (
+        <KonvaImage
+          image={bitmap}
           opacity={background.opacity}
-          fillPatternImage={bitmap}
-          fillPatternRepeat="no-repeat"
-          {...patternFit(bitmap, artboard, background.fit)}
+          {...imagePlacement(
+            bitmap,
+            artboard,
+            background.fit,
+            background.align,
+            background.rotation,
+          )}
         />
       )}
     </Layer>
@@ -94,35 +125,63 @@ function gradientEnd(angle: number, box: { width: number; height: number }) {
 }
 
 /**
- * Scales and offsets the fill pattern so the image covers (or fits inside) the
- * artboard, using the same crop maths as the device screen.
+ * Places the background bitmap as a positioned node rather than a fill pattern.
+ *
+ * A node because rotation and vertical alignment are plain geometry this way:
+ * the *footprint* (the rotated bounding box) is what covers or fits the
+ * artboard, and the node spins around the footprint's centre. Cover overflow
+ * paints past the artboard, which is fine — the layer clips to the artboard in
+ * the preview, and export crops to it.
  */
-function patternFit(
+function imagePlacement(
   bitmap: HTMLImageElement,
   artboard: { width: number; height: number },
   fit: "cover" | "contain",
+  align: "top" | "center" | "bottom",
+  rotation: 0 | 90 | 180 | 270,
 ) {
   const natural = { width: bitmap.naturalWidth, height: bitmap.naturalHeight };
 
-  if (fit === "contain") {
-    const scale = Math.min(
-      artboard.width / natural.width,
-      artboard.height / natural.height,
-    );
-    return {
-      fillPatternScaleX: scale,
-      fillPatternScaleY: scale,
-      fillPatternOffsetX: -(artboard.width / scale - natural.width) / 2,
-      fillPatternOffsetY: -(artboard.height / scale - natural.height) / 2,
-    };
-  }
+  // A quarter-turned image presents its height as width and vice versa.
+  const sideways = rotation % 180 !== 0;
+  const effective = sideways
+    ? { width: natural.height, height: natural.width }
+    : natural;
 
-  const crop = coverCrop(natural, artboard);
-  const scale = artboard.width / crop.width;
+  const scale =
+    fit === "cover"
+      ? Math.max(
+          artboard.width / effective.width,
+          artboard.height / effective.height,
+        )
+      : Math.min(
+          artboard.width / effective.width,
+          artboard.height / effective.height,
+        );
+
+  const footprint = {
+    width: effective.width * scale,
+    height: effective.height * scale,
+  };
+
+  const y =
+    align === "top"
+      ? 0
+      : align === "bottom"
+        ? artboard.height - footprint.height
+        : (artboard.height - footprint.height) / 2;
+
+  const width = natural.width * scale;
+  const height = natural.height * scale;
+
   return {
-    fillPatternScaleX: scale,
-    fillPatternScaleY: scale,
-    fillPatternOffsetX: crop.x,
-    fillPatternOffsetY: crop.y,
+    width,
+    height,
+    rotation,
+    // Spin around the node's own centre, parked at the footprint's centre.
+    offsetX: width / 2,
+    offsetY: height / 2,
+    x: (artboard.width - footprint.width) / 2 + footprint.width / 2,
+    y: y + footprint.height / 2,
   };
 }

@@ -5,9 +5,10 @@ import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import { exportStage } from "@/lib/export/export-stage";
 
 import {
-  selectCardScale,
   selectOpaqueFallback,
+  selectScreenArtboard,
   selectScreenImageUrls,
+  selectScreenScale,
 } from "./selectors";
 import type { EditorState } from "./state";
 
@@ -38,7 +39,8 @@ export async function captureDocThumbnail(
     const stage = getStage(screenId);
     if (!stage) return null;
 
-    const { artboard } = state.doc;
+    // The first screen's own canvas, in case it was broken out of the set.
+    const artboard = selectScreenArtboard(screenId)(state);
 
     const blob = await exportStage(
       stage,
@@ -49,7 +51,7 @@ export async function captureDocThumbnail(
         transparent: false,
       },
       {
-        fitScale: selectCardScale(state),
+        fitScale: selectScreenScale(screenId)(state),
         artboard,
         imageUrls: selectScreenImageUrls(state, screenId),
         opaqueFallback: selectOpaqueFallback(state, screenId),

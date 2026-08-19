@@ -14,6 +14,7 @@ import type { DeviceSpec, Orientation } from "@/lib/devices/types";
 import {
   EDITOR_DOC_VERSION,
   plainTextToRuns,
+  ZERO_CORNERS,
   type Artboard,
   type DeviceLayer,
   type EditorDoc,
@@ -185,6 +186,8 @@ export function createTemplateScreen(
     name: "",
     pinned: false,
     background: structuredClone(template.background),
+    corners: { ...ZERO_CORNERS },
+    size: null,
     layers: [
       createDeviceLayer(spec, artboard, template.colorwayId),
       createTextLayer("title", artboard, {
@@ -267,6 +270,10 @@ export function createBlankScreen(
     name: "",
     pinned: false,
     background: structuredClone(source?.background ?? template.background),
+    // A fresh screen starts square even next to a rounded one — the rounding
+    // reads as a per-frame styling choice, not part of the set's layout.
+    corners: { ...ZERO_CORNERS },
+    size: null,
     layers: [
       createDeviceLayer(spec, doc.artboard, template.colorwayId),
       createTextLayer("title", doc.artboard, {

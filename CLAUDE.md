@@ -62,7 +62,10 @@ text layers are a discriminated union on `kind`, narrowed with `isDeviceLayer` /
 `isImageLayer` / `isTextLayer` from the schema — never hand-written `kind ===`
 chains. The background is *not* a layer: it is always behind everything and is
 the one thing the export pipeline hides on its own. Device model, orientation and
-artboard are document-level, because five frames of one listing have to agree.
+artboard are document-level, because five frames of one listing have to agree —
+though a screen may carry a `size` override that breaks it out of the shared
+canvas (null means "use `doc.artboard`"; per-screen geometry must always go
+through `screen.size ?? doc.artboard`, via `selectScreenArtboard`).
 A text layer's copy is an ordered array of styled *runs* for the same reason, and
 Konva cannot lay that out — [lib/canvas/rich-text.ts](lib/canvas/rich-text.ts) owns
 every wrap point and fragment position, and preview and export share it. Read
@@ -192,6 +195,13 @@ success (rule 3) while still using the envelope for errors.
   holding one fails its own schema and silently drops the whole draft on reload.
 
 ### Current state
+
+[PROJECT-DOCUMENTATION.md](PROJECT-DOCUMENTATION.md) is the client-facing living
+documentation — feature index, workflows, API/database overviews, change history.
+**Any change that adds, modifies, or removes a feature must update it in the same
+piece of work**: the affected feature section, the Feature Index row, workflows,
+API/database tables, status, and a Change History entry. It documents only shipped
+behaviour, never plans.
 
 [TASK.md](TASK.md) is the running task log — what has been built, in order, with the
 doc-version bump each task needed. **Keep it current**: add an entry when a task

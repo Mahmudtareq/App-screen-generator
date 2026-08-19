@@ -201,6 +201,23 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * fail the enum parse and drop the draft whole.
    */
   7: (doc) => ({ ...doc, version: 8 }),
+
+  /**
+   * v8 → v9: the background union gains a `radial` gradient variant, and an
+   * image background gains `align` and `rotation`. No v8 document holds a
+   * radial, and the new fields default to the old behaviour (centred,
+   * unrotated), so this only stamps the version — the stamp tells older
+   * clients the document may hold a background they cannot parse.
+   */
+  8: (doc) => ({ ...doc, version: 9 }),
+
+  /**
+   * v9 → v10: a screen gains `corners` — per-corner rounding of the exported
+   * frame — and `size`, its own canvas dimensions when broken out of the
+   * set's shared artboard. The defaults (square corners, null size) are
+   * exactly what every v9 screen was, so this only stamps the version.
+   */
+  9: (doc) => ({ ...doc, version: 10 }),
 };
 
 /**

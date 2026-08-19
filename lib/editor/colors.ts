@@ -98,7 +98,8 @@ function mapScreenColors(
   const background: Background =
     screen.background.type === "color"
       ? { ...screen.background, color: swap(screen.background.color, "background") }
-      : screen.background.type === "gradient"
+      : screen.background.type === "gradient" ||
+          screen.background.type === "radial"
         ? {
             ...screen.background,
             stops: screen.background.stops.map((stop) => ({

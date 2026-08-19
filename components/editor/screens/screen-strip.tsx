@@ -12,7 +12,11 @@ import {
   STRIP_PADDING,
 } from "@/lib/canvas/fit";
 import { useElementSize } from "@/hooks/use-element-size";
-import { selectCardScale } from "@/lib/editor/selectors";
+import {
+  selectCardScale,
+  selectScreenArtboard,
+  selectScreenScale,
+} from "@/lib/editor/selectors";
 import { useEditorStore } from "@/lib/editor/store";
 
 import { InspectorPanel } from "../panels/inspector-panel";
@@ -94,8 +98,6 @@ export function ScreenStrip() {
                 key={id}
                 screenId={id}
                 index={index}
-                cardWidth={cardWidth}
-                cardHeight={cardHeight}
                 panelWidth={panelWidth}
                 selected={selectedScreenId === id}
               />
@@ -132,23 +134,27 @@ export function ScreenStrip() {
  * A card, plus its inspector when selected.
  *
  * Split into its own component so an unselected card does not re-render when the
- * selection moves between two other screens.
+ * selection moves between two other screens — and so each card can size itself:
+ * a screen broken out to its own canvas renders at its own fit scale, giving the
+ * strip mixed card widths while every card still fills the strip's height.
  */
 function ScreenStripItem({
   screenId,
   index,
-  cardWidth,
-  cardHeight,
   panelWidth,
   selected,
 }: {
   screenId: string;
   index: number;
-  cardWidth: number;
-  cardHeight: number;
   panelWidth: number;
   selected: boolean;
 }) {
+  const artboard = useEditorStore(selectScreenArtboard(screenId));
+  const scale = useEditorStore(selectScreenScale(screenId));
+
+  const cardWidth = artboard.width * scale + CANVAS_GUTTER_X * 2;
+  const cardHeight = artboard.height * scale + CANVAS_GUTTER_Y * 2;
+
   return (
     <>
       <ScreenCard

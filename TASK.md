@@ -498,6 +498,115 @@ the dashboard" gap; duplicate still has no UI.
 
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
 
+### 21. Batch export — sectioned export dialog with Preview and ZIP download ✅
+**19 Aug 2026**
+
+Asked for: export was one screen at a time — rework the dialog into a sectioned
+modal (AppScreens-style sidebar) with **Preview** (all screens) and **Download**
+(pick screens, save the set as a ZIP). More sections come later.
+
+1. **`lib/export/zip.ts`** — dependency-free, store-only ZIP writer (local
+   headers + central directory + EOCD, CRC-32, UTF-8 names). Store, not
+   deflate: the entries are already-compressed PNG/JPG/WebP. Verified with
+   `unzip -t`.
+2. **`export-dialog.tsx` reworked**: sidebar with two sections. *Preview*
+   renders every screen through `exportStage` at ~280px (object URLs, revoked
+   on unmount). *Download* keeps the existing format/scale/quality/transparent
+   controls, adds a screen multi-select (all selected by default), and saves —
+   a single file directly when one screen is selected, otherwise
+   `<project>-screenshots.zip` with `NN-<screen-name>.<ext>` entries and
+   `Exporting n/m…` progress.
+3. **Memory stays bounded**: screens rasterise *sequentially*, one
+   full-resolution canvas at a time — this sidesteps the five-32MP-canvases
+   iPad failure PLAN.md's batch-export note warns about, without the Phase 3
+   server-side compositor. The per-scale dimension guard is unchanged.
+4. Dialog body mounts fresh per open (selection/previews reset without
+   effects); close is blocked mid-export.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean; ZIP output
+validated with `unzip -t` (CRCs OK, contents extract byte-exact).
+
+### 22. Background panel — radial gradients, presets, picker-backed images (doc v9) ✅
+**19 Aug 2026**
+
+Asked for: restyle the Background panel toward the AppScreens reference —
+swatch-style type buttons, radial gradients with centre/outer + from/to %,
+gradient presets, and background images chosen through the same picker dialog
+image layers use.
+
+1. **Doc v8 → v9**: `backgroundSchema` gains a `radial` variant (stops run
+   centre → corner; offsets are fractions of the half-diagonal), and the image
+   variant gains `align` (top/center/bottom) and `rotation` (quarter turns),
+   both defaulting to the old behaviour. Stamp-only `MIGRATIONS[8]`. Rendering
+   in `background-layer.tsx` (`fillRadialGradient*`, end radius = half
+   diagonal; the image background became a positioned `Image` node so
+   rotation/alignment are plain geometry — the layer's artboard clip and the
+   export crop bound the cover overflow), CSS approximation in
+   `template-preview.ts`, `selectOpaqueFallback` and the colour replacer's
+   `mapScreenColors` all handle it.
+2. **Panel redesign** (`background-panel.tsx`): the labelled tab row became
+   swatch-shaped style buttons (none / solid / linear / radial / image) that
+   show the live style, plus a **Presets** popover of twelve ready-made
+   linear/radial looks applied whole. Gradients get a 72px live preview
+   square, From/To (or Centre/Outer) colour+hex rows, a direction-flip /
+   swap-colours control, and radial gets From/To % stop positions.
+3. **Background images go through the image picker**: "Select background"
+   opens `ImagePickerDialog` on `backgroundAssetKey(screenId)` via
+   `useApplyImagePick` — upload, library and project-image tabs included —
+   closing the FEATURES backlog item about the background's separate dropzone.
+   The swatch shows what the canvas currently draws (local URL before upload).
+4. Unchanged: fit/opacity/remove, apply-to-all (still skips pinned screens),
+   solid presets, and every other panel.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
+### 23. Screen frame — per-corner rounding and size controls (doc v10) ✅
+**19 Aug 2026**
+
+Asked for: round the artboard frame itself (per-corner radii) and adjust its
+width/height, per screen, without touching anything else.
+
+1. **Doc v9 → v10**: `screenSchema` gains `corners`
+   ({topLeft,topRight,bottomRight,bottomLeft}, artboard px, default all-zero =
+   today's square frame). Stamp-only `MIGRATIONS[9]`.
+2. **`lib/canvas/artboard-clip.ts`** — one per-corner clip builder shared by
+   preview and export. The live canvas rounds each corner by
+   max(screen radius, card ring's cosmetic 12px); `exportStage` swaps that for
+   the document radii exactly (new `ExportContext.corners`), but only for
+   alpha formats — a JPEG would fill the cut with black, so it stays square.
+3. **New "Screen frame" inspector section** (`screen-shape-panel.tsx`):
+   quick rounding presets (0/32/64/120), four per-corner inputs, and per-screen
+   width/height inputs with a "Use project size" reset.
+4. **Per-screen size** (same v10): `screenSchema.size` is a nullable artboard
+   override — null means the set's shared `doc.artboard`. `setScreenSize`
+   rescales that screen's layout on change (the `rescaleLayer` treatment a
+   document retarget gives); `setArtboard` skips broken-out screens like it
+   skips pinned ones. `selectScreenArtboard`/`selectScreenScale` are the one
+   way to per-screen geometry now — the stage, background, full-bleed device,
+   strip card sizing (mixed widths, one strip height), export dialog
+   (per-screen dims/guards/previews) and thumbnail capture all went through
+   them. CLAUDE.md's rule 2 documents the override.
+5. New screens start square at the shared size; duplicates inherit their
+   source's corners and size.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
+### 24. PROJECT-DOCUMENTATION.md — client-facing living documentation ✅
+**19 Aug 2026**
+
+Asked for: a single readable document covering every *implemented* feature —
+overview, feature index with work types and statuses, per-feature sections,
+workflows (incl. save-project vs save-as-template vs update-template), template
+system, project lifecycle, editor, auth, API and database overviews, lists,
+file handling, integrations, validation — maintained as a living document.
+
+Written from the codebase (FEATURES.md statuses, TASK.md history, and this
+session's exploration); every referenced file path verified to exist; honest
+partial statuses kept (duplicate-project API without UI, unused Asset records,
+draft device fidelity, dashboard search API without a search box). CLAUDE.md's
+"Current state" section now requires updating it alongside any feature change.
+Change History dates come from this log, not invention.
+
 ---
 
 ## Open
