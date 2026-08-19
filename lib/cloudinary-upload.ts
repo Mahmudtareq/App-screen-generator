@@ -7,7 +7,7 @@ import { routes } from "@/config/routes";
  * per-session churn with a slash in it, and neither belongs in a signed folder
  * path. Cloudinary only needs to know the sort of image this is.
  */
-export type UploadKind = "screenshot" | "image" | "background";
+export type UploadKind = "screenshot" | "image" | "background" | "thumbnail";
 
 export interface UploadedAsset {
   publicId: string;

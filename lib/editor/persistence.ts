@@ -192,6 +192,15 @@ const MIGRATIONS: Record<number, (doc: Record<string, unknown>) => Record<string
    * stamps the version.
    */
   6: (doc) => ({ ...doc, version: 7 }),
+
+  /**
+   * v7 → v8: `templateId` widens from the built-in enum to any template id
+   * (user-saved templates, `custom:<id>`). Every id a v7 document can hold is
+   * still valid, so this only stamps the version — the stamp tells a client
+   * running older code that the id may be unresolvable, rather than letting it
+   * fail the enum parse and drop the draft whole.
+   */
+  7: (doc) => ({ ...doc, version: 8 }),
 };
 
 /**

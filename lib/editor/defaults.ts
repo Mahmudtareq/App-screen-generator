@@ -240,7 +240,7 @@ export function createDocFromTemplate(
 
   return {
     version: EDITOR_DOC_VERSION,
-    templateId: template.id as EditorDoc["templateId"],
+    templateId: template.id,
     deviceId: template.deviceId,
     orientation,
     artboard,

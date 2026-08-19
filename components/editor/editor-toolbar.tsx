@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { ARTBOARD_PRESETS, getArtboardPreset } from "@/config/artboards";
 import { routes } from "@/config/routes";
 import { getTemplate } from "@/config/templates";
+import { isCustomTemplateId } from "@/schemas/template";
 import { useEditorHistory, useEditorStore } from "@/lib/editor/store";
 import { cn } from "@/lib/utils";
 
@@ -111,7 +112,13 @@ export function EditorToolbar({
             "size-8 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400",
           )}
           aria-label="Change template"
-          title={`Template — ${getTemplate(templateId).label}`}
+          // A custom template id would fall back to the default recipe's label
+          // and mislabel the document "Aurora".
+          title={
+            isCustomTemplateId(templateId)
+              ? "Template — Custom"
+              : `Template — ${getTemplate(templateId).label}`
+          }
         >
           <LayoutTemplate className="size-4" />
         </Button>

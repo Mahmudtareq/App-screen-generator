@@ -893,11 +893,15 @@ job, and doing it one at a time is the tedium this replaces.
 - `applyTemplate` in [lib/editor/slices/document.ts](lib/editor/slices/document.ts)
 - [components/editor/template-picker.tsx](components/editor/template-picker.tsx) — in-editor dialog
 - [components/editor/template-gallery.tsx](components/editor/template-gallery.tsx) + [app/templates/](app/templates/)
+- User-saved templates: [schemas/template.ts](schemas/template.ts),
+  [models/Template.ts](models/Template.ts), [app/api/templates/](app/api/templates/),
+  [actions/templates/templateActions.ts](actions/templates/templateActions.ts),
+  [components/editor/templates/save-template-dialog.tsx](components/editor/templates/save-template-dialog.tsx),
+  [lib/editor/template-thumbnail.ts](lib/editor/template-thumbnail.ts)
 
-**How it works.** Two templates today: **Aurora** (lavender wash, dark headline) and
-**Spotlight** (violet, white headline). Static TypeScript for the same reason as the
-device catalog — the editor needs one synchronously to render its first frame, and it
-keeps `TemplateId` a literal union.
+**How it works.** Two built-in templates: **Aurora** (lavender wash, dark headline)
+and **Spotlight** (violet, white headline). Static TypeScript for the same reason as
+the device catalog — the editor needs one synchronously to render its first frame.
 
 Two genuinely different operations, because "use this template" means two things:
 
@@ -907,21 +911,45 @@ Two genuinely different operations, because "use this template" means two things
 - **Start over** (`createDocFromTemplate`) discards the screens and rebuilds five from
   the template's own copy.
 
+**User-saved templates.** The Save button's dropdown offers "Save as new template…"
+and, when the document came from a template the user owns, "Update template…". A saved
+template is a **full document snapshot** (`Template.doc`, Mixed, like `Project.doc`) —
+not a styling recipe — so it only offers "start over"; the restyle path stays
+built-ins only. Details:
+
+- Ids are namespaced `custom:<24-hex>` (`customTemplateId` in
+  [schemas/template.ts](schemas/template.ts)), and `doc.templateId` is a **free
+  string** since doc v8 for exactly that reason — an unresolvable id costs the
+  default recipe for new layers, not the document.
+- Reads are public (`GET /api/templates[,/:id]`, `enabled: true` filter — guests can
+  browse and use); writes filter on `createdBy` and 404 on foreign ids, like projects.
+- The snapshot goes through `prepareDocForSave` first, so it only ever holds https
+  URLs; a thumbnail is rendered from the first screen through `exportStage` at ~400px
+  and uploaded under the `thumbnail` kind — failure leaves `thumbnailUrl` null and
+  never blocks the save.
+- `creatorName` is denormalised from the email local-part at create time (the
+  Auth.js-shared `users` collection is deliberately not populated).
+- ⚠️ Snapshot docs reference the creator's Cloudinary URLs by reference — the same
+  trade-off as project duplicate; deleting those assets breaks derived documents.
+
 ⚠️ [config/templates.ts](config/templates.ts) must only ever `import type` from
-[schemas/editor.ts](schemas/editor.ts) — the schema imports `TEMPLATE_IDS` from it, so
-a value import closes a module cycle.
+[schemas/editor.ts](schemas/editor.ts) — the schema imports `DEFAULT_TEMPLATE_ID` and
+`MAX_SCREENS` from it, so a value import closes a module cycle.
 
 **Status: 🟡**
 
 **Backlog**
 
-- **Only two templates.** Adding a third is a data-only change.
+- **Only two built-in templates.** Adding a third is a data-only change.
 - `titlePill` is in the `Template` type and wired through `createTemplateScreen`, but
   both shipped templates set it to `null`, so that path is unexercised.
 - No test that every template's output parses against `editorDocSchema` — today the two
   shipped ones are known-good by inspection, not assertion.
-- No template thumbnails; the gallery draws an approximation in CSS.
-- No user-saved templates.
+- Built-in templates still draw a CSS approximation; only user-saved templates get a
+  real thumbnail.
+- No "my templates" management view (rename/delete outside the editor); `deleteTemplate`
+  exists as an action but has no UI.
+- Template versioning is a reserved `version` counter, not a history.
 
 ---
 

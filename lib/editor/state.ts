@@ -29,8 +29,14 @@ export interface DocumentSlice {
   doc: EditorDoc;
 
   loadDoc: (doc: EditorDoc) => void;
-  /** Rebuilds the document from a template, discarding the current screens. */
+  /** Restyles every unpinned screen from a template, keeping ids, copy and images. */
   applyTemplate: (templateId: string) => void;
+  /**
+   * Records which template the document belongs to, without restyling anything.
+   * Written after "save as template" so the just-created template immediately
+   * becomes the one "Update template" targets.
+   */
+  setTemplateId: (templateId: string) => void;
 
   /* ------------------------------ document level ----------------------------- */
 

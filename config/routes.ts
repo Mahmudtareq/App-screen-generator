@@ -22,6 +22,8 @@ export const routes = {
     projects: "/api/projects",
     project: (id: string) => `/api/projects/${id}`,
     projectDuplicate: (id: string) => `/api/projects/${id}/duplicate`,
+    templates: "/api/templates",
+    template: (id: string) => `/api/templates/${id}`,
     assets: "/api/assets",
     asset: (id: string) => `/api/assets/${id}`,
     adminDevices: "/api/admin/devices",

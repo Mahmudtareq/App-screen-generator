@@ -4,6 +4,8 @@ import { ImageOff } from "lucide-react";
 import { routes } from "@/config/routes";
 import type { ProjectSummary } from "@/schemas/project";
 
+import { DeleteProjectButton } from "./delete-project-button";
+
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["year", 365 * 24 * 60 * 60_000],
   ["month", 30 * 24 * 60 * 60_000],
@@ -63,6 +65,11 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             Open in editor
           </span>
         </div>
+
+        <DeleteProjectButton
+          project={project}
+          updatedLabel={relativeTime(project.updatedAt)}
+        />
       </div>
 
       <div className="space-y-0.5 border-t p-3">

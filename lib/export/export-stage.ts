@@ -13,12 +13,16 @@ import {
   SUPPORTS_ALPHA,
   SUPPORTS_QUALITY,
   type ExportFormat,
-  type ExportScale,
 } from "./formats";
 
 export interface ExportOptions {
   format: ExportFormat;
-  scale: ExportScale;
+  /**
+   * Output pixels per artboard px. The export dialog offers the integer
+   * `ExportScale` steps; fractional values are valid too — the thumbnail
+   * pipeline renders at well under 1.
+   */
+  scale: number;
   /** 0..1. Ignored for PNG. */
   quality: number;
   transparent: boolean;

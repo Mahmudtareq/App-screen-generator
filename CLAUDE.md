@@ -152,9 +152,13 @@ success (rule 3) while still using the envelope for errors.
   first paint. Rotated specs must stay memoised
   ([lib/devices/orientation.ts](lib/devices/orientation.ts)): returning a fresh
   object per call causes an infinite render loop under Zustand v5's `Object.is`.
-- Templates are static TypeScript too, in [config/templates.ts](config/templates.ts),
+- Built-in templates are static TypeScript in [config/templates.ts](config/templates.ts),
   and that file must only ever `import type` from `schemas/editor.ts` — the schema
-  imports `TEMPLATE_IDS` from it, so a value import would close a module cycle.
+  imports `DEFAULT_TEMPLATE_ID`/`MAX_SCREENS` from it, so a value import would
+  close a module cycle. User-saved templates are database rows
+  ([models/Template.ts](models/Template.ts)) holding a full `doc` snapshot; their
+  ids are namespaced `custom:<id>` and `doc.templateId` is a free string for
+  exactly that reason.
 
 ### Editor UI
 

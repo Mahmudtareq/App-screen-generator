@@ -24,7 +24,7 @@ import { apiResponse } from "@/lib/server.utils";
  * resolving; nothing writes it any more. New image layers use "image".
  */
 const bodySchema = z.object({
-  kind: z.enum(["screenshot", "image", "logo", "background"]),
+  kind: z.enum(["screenshot", "image", "logo", "background", "thumbnail"]),
 });
 
 export const POST = asyncHandler(

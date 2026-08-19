@@ -421,6 +421,83 @@ No doc shape change, `EDITOR_DOC_VERSION` untouched.
 
 **Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
 
+### 18. Save as Template — user-saved templates, doc v8 ✅
+**19 Aug 2026**
+
+Asked for: alongside the unchanged "Save project", let a user save their
+customized project as a reusable template (new or updating the one it came
+from), with metadata, auto-generated thumbnails, and immediate appearance in a
+public template list.
+
+1. **Doc v7 → v8**: `doc.templateId` widened from `z.enum(TEMPLATE_IDS)` to a
+   free string (the `deviceId` v6→v7 treatment — an unresolvable id costs the
+   default recipe, not the document), stamp-only `MIGRATIONS[7]`. The schema no
+   longer imports `TEMPLATE_IDS`.
+2. **`models/Template.ts`** — full `EditorDoc` snapshot in `doc` (Mixed), plus
+   name/description/category/tags/thumbnailUrl, `createdBy` + denormalised
+   `creatorName` (email local-part), `sourceProjectId`/`sourceTemplateId`,
+   `enabled`, `version`. Indexes `{enabled,updatedAt}` and
+   `{createdBy,updatedAt}`; registered in the barrel and `sync-indexes`.
+3. **Routes** `app/api/templates[,/[id]]`: public GET list
+   (search/category/pagination via `escapeRegex`+`makePaginate`) and GET detail
+   (`enabled` filter); authed POST/PATCH/DELETE with `{_id, createdBy}`
+   ownership filters, 404 for foreign ids. The stored doc's `templateId` is
+   rewritten server-side to `custom:<id>`; a content PATCH `$inc`s `version`.
+   Thin actions in `actions/templates/templateActions.ts` (`templates` tag).
+4. **Save UI**: the Save button became a split control — one-click project save
+   untouched; a chevron menu offers "Save as new template…" and (when
+   `doc.templateId` is `custom:`) "Update template…", both opening
+   `save-template-dialog.tsx`. The snapshot runs through `prepareDocForSave`,
+   the thumbnail through `exportStage` at ~400px (`ExportOptions.scale` widened
+   to `number`) uploaded under a new `thumbnail` kind — null on failure, never
+   blocking the save. Create stamps the new id back into the doc via
+   `setTemplateId`.
+5. **Lists**: `/templates` gained server-paginated + searchable "Community
+   templates" under the built-ins; the in-editor picker fetches page 1 on open
+   and offers "Start over from this template" for community picks (restyle
+   stays built-ins only — a snapshot has no recipe). `previewCss` deduped into
+   `template-preview.ts`.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean;
+`pnpm sync-indexes` built both Template indexes. Live against the dev server:
+create-template produced a row with a real Cloudinary thumbnail, doc stored at
+v8 with `templateId: custom:<id>`; public list/detail return it, unauthenticated
+POST/PATCH 401, malformed id 400.
+
+### 19. Project thumbnails on save ✅
+**19 Aug 2026**
+
+Asked for: dashboard project cards showed "No preview yet" while template cards
+had real previews — close the gap.
+
+The template thumbnail capture became the shared
+`captureDocThumbnail` (`lib/editor/template-thumbnail.ts` →
+`lib/editor/thumbnail.ts`), and the Save button now runs it on every project
+save: create sends the URL, update sends it only when capture succeeded so a
+one-off failure cannot erase the card's existing image. `PLAN.md`'s "thumbnail
+generation on save" gap is closed; existing projects gain a preview on their
+next save (captures happen client-side from the live canvas, so there is
+nothing to backfill server-side).
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
+### 20. Project delete from the dashboard ✅
+**19 Aug 2026**
+
+Asked for: the DELETE route and `deleteProject` action existed with no UI —
+wire a delete button with a confirmation modal onto the project card.
+
+`components/dashboard/delete-project-button.tsx` is a client island inside the
+server-rendered card: a trash button appears on card hover (top-right of the
+thumbnail, `preventDefault`+`stopPropagation` because the whole card is a link),
+opens a confirmation dialog naming the project, and the destructive confirm
+runs `deleteProject` in a transition → toast → `router.refresh()`
+(device-manager's pattern). A modal rather than an undo toast because the
+DELETE is permanent. Closes the delete half of PLAN.md's "duplicate/delete from
+the dashboard" gap; duplicate still has no UI.
+
+**Checked:** `pnpm lint && pnpm type-check && pnpm build` clean.
+
 ---
 
 ## Open

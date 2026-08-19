@@ -181,7 +181,7 @@ export function createDocumentSlice(
 
         return {
           ...doc,
-          templateId: template.id as EditorDoc["templateId"],
+          templateId: template.id,
           screens: doc.screens.map((screen) => {
             if (screen.pinned) return screen;
 
@@ -211,6 +211,9 @@ export function createDocumentSlice(
           }),
         };
       }),
+
+    setTemplateId: (templateId) =>
+      patchDoc(set, (doc) => ({ ...doc, templateId })),
 
     /* ----------------------------- document level ---------------------------- */
 

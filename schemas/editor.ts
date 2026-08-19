@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { ARTBOARD_MAX, ARTBOARD_MIN } from "@/config/artboards";
 import { DEFAULT_FONT_ID } from "@/config/fonts";
-import { DEFAULT_TEMPLATE_ID, MAX_SCREENS, TEMPLATE_IDS } from "@/config/templates";
+import { DEFAULT_TEMPLATE_ID, MAX_SCREENS } from "@/config/templates";
 import { DEFAULT_DEVICE_ID } from "@/lib/devices/catalog";
 
 /**
@@ -27,7 +27,7 @@ import { DEFAULT_DEVICE_ID } from "@/lib/devices/catalog";
  * thing the export pipeline needs to hide on its own.
  */
 
-export const EDITOR_DOC_VERSION = 7;
+export const EDITOR_DOC_VERSION = 8;
 
 const hexColorSchema = z
   .string()
@@ -339,8 +339,16 @@ export const screenSchema = z.object({
 
 export const editorDocSchema = z.object({
   version: z.number().int().min(1).default(EDITOR_DOC_VERSION),
-  /** Which template the project started from; kept so the picker can show it. */
-  templateId: z.enum(TEMPLATE_IDS).default(DEFAULT_TEMPLATE_ID),
+  /**
+   * Which template the project started from; kept so the picker can show it.
+   *
+   * A free string rather than an enum of the built-in templates: templates can
+   * now be saved by users (`custom:<id>`), so a document may name one this
+   * build has never heard of. `getTemplate` falls back to the default recipe
+   * rather than throwing, so an unresolvable id costs the default styling for
+   * new layers, not a whole document.
+   */
+  templateId: z.string().min(1).max(64).default(DEFAULT_TEMPLATE_ID),
   /**
    * A free string rather than an enum of the built-in catalog: devices can now
    * be authored in the admin panel, so a document may name one this build has
